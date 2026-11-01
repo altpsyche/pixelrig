@@ -90,6 +90,192 @@ do
   end
 end
 
+-- Saving clips: file names never collide, duplicates never shadow, a failed write returns (#7).
+do
+  local f = Clip.fileName
+  -- Readable: the clip name with path-unsafe characters replaced by '_' (owner ruling on #53).
+  check(f("Run test") == "Run_test.json" and f("a/b") == "a_b.json" and f("日本") == "日本.json",
+        "file name: readable slug of the clip name (" .. f("Run test") .. ", " .. f("a/b") .. ", " .. f("日本") .. ")")
+  check(f("Run test", 2) == "Run_test (2).json", "file name: numbered suffix (" .. f("Run test", 2) .. ")")
+  check(f("con") == "_con.json" and f("Nul.x") == "_Nul.x.json" and f(".hidden") == "_hidden.json"
+        and f("a.") == "a_.json", "file name: device names, leading and trailing dots escaped")
+  local safe = true
+  for _, n in ipairs({ "a/b", "a\\b", "x:y*z?", "C<>|\"", "..", "con", "Nul", "lpt1", "COM3.b", "a.", "tab\tx" }) do
+    local stem = f(n):gsub("%.json$", "")
+    local base = stem:match("^[^.]*"):lower()
+    if stem:find('[%c/\\:*?"<>| ]') or stem:find("^%.") or stem:find("%.$") or base == "con"
+      or base == "nul" or base:match("^lpt%d$") or base:match("^com%d$") then
+      safe = false
+      print("     unsafe file name for '" .. n .. "': " .. f(n))
+    end
+  end
+  check(safe, "file name: no path-unsafe characters, no Windows device names")
+
+  local dir = app.fs.joinPath(out, "saveclips")
+  app.fs.makeAllDirectories(dir)
+  for _, file in ipairs(app.fs.listFiles(dir)) do os.remove(app.fs.joinPath(dir, file)) end
+  local run = Util.readJson(app.fs.joinPath(root, "clips", "run.json"))
+  local function put(file, name, fps)
+    local d = Util.deepCopy(run)
+    d.name, d.fps = name, fps
+    Util.writeJson(app.fs.joinPath(dir, file), d)
+  end
+  -- Two older files carrying one clip name: the first in name order wins, the other is listed.
+  put("b-old.json", "Dup", 11)
+  put("a-old.json", "Dup", 12)
+  local userDir = M.userClipsDir
+  M.userClipsDir = function() return dir end
+  local dupLib = M.loadLibrary()
+  local dup = dupLib.clips.Dup
+  check(dup and dup.fps == 12 and dup.file == app.fs.joinPath(dir, "a-old.json"),
+        "library: duplicate clip name loads the first file by name (" .. tostring(dup and dup.file) .. ")")
+  local listed = false
+  for _, s in ipairs(dupLib.skipped) do
+    if s.file == "b-old.json" and s.reason:find("a-old.json", 1, true) then listed = true end
+  end
+  check(listed, "library: the shadowed duplicate is listed as skipped")
+  -- A user clip named like a built-in is listed too, not dropped without a word.
+  put("my-run.json", "Run", 13)
+  local builtinDup = false
+  for _, sk in ipairs(M.loadLibrary().skipped) do
+    if sk.file == "my-run.json" and sk.reason == "same clip name as a built-in" then builtinDup = true end
+  end
+  os.remove(app.fs.joinPath(dir, "my-run.json"))
+  check(builtinDup, "library: a user clip named like a built-in is listed as skipped")
+  check(dup and Clip.export(dup).file == nil and Clip.export(dup).origin == nil, "export drops runtime fields")
+
+  -- Saving over an existing user clip writes its own file; a new name gets its readable file.
+  local path, replacing = M.clipSavePath(dupLib, "Dup")
+  check(dup and path == dup.file and replacing == "your clip 'Dup'",
+        "save path: an existing user clip is saved over its own file (" .. tostring(replacing) .. ")")
+  local function savePath(name)
+    local p, r = M.clipSavePath(M.loadLibrary(), name)
+    return app.fs.fileName(p), r
+  end
+  check(savePath("a/b") == "a_b.json", "save path: a new name gets its readable file")
+  -- Two names, one slug: the second gets a numbered file, never the first's.
+  put("a_b.json", "a_b", 9)
+  local ab, abReplacing = savePath("a/b")
+  check(ab == "a_b (2).json" and abReplacing == nil, "save path: 'a/b' beside 'a_b' gets " .. ab)
+  put("a_b (2).json", "a?b", 9)
+  check(savePath("a*b") == "a_b (3).json", "save path: the next free number (" .. savePath("a*b") .. ")")
+  -- Names differing only in case share a file on a disk that ignores case: compared lowercased.
+  put("Walk.json", "Walk", 9)
+  check(savePath("walk") == "walk (2).json", "save path: 'walk' beside 'Walk' gets " .. savePath("walk"))
+  check(savePath("日本") ~= savePath("中文"), "save path: non-ASCII names get their own files")
+  -- A file at the slug holding another clip, or no clip, is never replaced.
+  Util.writeJson(app.fs.joinPath(dir, "Junk.json"), { 1, 2 })
+  local junk, junkReplacing = savePath("Junk")
+  check(junk == "Junk (2).json" and junkReplacing == nil, "save path: a file holding no clip is kept (" .. junk .. ")")
+  -- A file at the slug holding this very clip name, which did not load: replaced after asking.
+  put("Broke.json", "Broke", 9)
+  local brokeData = Util.readJson(app.fs.joinPath(dir, "Broke.json"))
+  brokeData.rig = "nope"
+  Util.writeJson(app.fs.joinPath(dir, "Broke.json"), brokeData)
+  local broke, brokeReplacing = savePath("Broke")
+  check(broke == "Broke.json" and brokeReplacing == "your clip 'Broke' (Broke.json)",
+        "save path: an unusable file holding the same name is replaced after asking (" .. tostring(brokeReplacing) .. ")")
+
+  local d = Util.deepCopy(run)
+  d.name, d.fps = "Dup", 20
+  local okWrite = Util.writeJson(path, d)
+  local after = M.loadLibrary().clips.Dup
+  check(okWrite and after and after.fps == 20, "library shows the saved clip afterwards")
+
+  -- A write that cannot happen returns nil and a reason, and leaves the old file as it was.
+  local blocked = app.fs.joinPath(dir, "blocked.json")
+  app.fs.makeAllDirectories(blocked)
+  local okCall, res, reason = pcall(Util.writeJson, blocked, d)
+  check(okCall and res == nil, "failed write returns instead of raising " .. (okCall and "" or tostring(res)))
+  check(type(reason) == "string" and reason:sub(1, 14) == "blocked.json: " and not reason:find(dir, 1, true),
+        "failed write gives a one-line reason (" .. tostring(reason) .. ")")
+  check(not app.fs.isFile(blocked .. ".tmp"), "failed write leaves no temporary file")
+  -- The temporary file cannot be made (a folder sits there): the clip on disk is untouched.
+  app.fs.makeAllDirectories(path .. ".tmp")
+  d.fps = 30
+  local _, writeWhy = Util.writeJson(path, d)
+  os.remove(path .. ".tmp")
+  local kept = M.loadLibrary().clips.Dup
+  check(writeWhy ~= nil and kept and kept.fps == 20, "failed write keeps the clip that was there")
+
+  -- Replacing a file where rename will not overwrite it (Windows): os.rename is stubbed to refuse
+  -- moving the temporary file onto an existing file, and, in the second case, to refuse it always.
+  local realRename = os.rename
+  local function stubRename(always)
+    local first = true
+    os.rename = function(from, to)
+      if from == path .. ".tmp" and to == path and (always or (first and app.fs.isFile(to))) then
+        first = false
+        return nil, from .. ": File exists"
+      end
+      return realRename(from, to)
+    end
+  end
+  d.fps = 40
+  stubRename(false)
+  local okReplace = Util.writeJson(path, d)
+  os.rename = realRename
+  local replaced = M.loadLibrary().clips.Dup
+  check(okReplace and replaced and replaced.fps == 40 and not app.fs.isFile(path .. ".bak"),
+        "write replaces a file when rename will not overwrite, leaving no backup")
+  d.fps = 50
+  stubRename(true)
+  local okStuck, stuckWhy = Util.writeJson(path, d)
+  os.rename = realRename
+  local survived = M.loadLibrary().clips.Dup
+  check(not okStuck and stuckWhy and survived and survived.fps == 40
+        and not app.fs.isFile(path .. ".bak") and not app.fs.isFile(path .. ".tmp"),
+        "write that cannot move the new file in keeps the old one (" .. tostring(stuckWhy) .. ")")
+
+  -- A stale backup beside the clip, as a save cut short leaves: a rename that will not overwrite
+  -- any existing file (as on Windows) still replaces the clip, and the stale backup goes.
+  local function putText(file, text)
+    local fh = io.open(app.fs.joinPath(dir, file), "w"); fh:write(text); fh:close()
+  end
+  putText(app.fs.fileName(path) .. ".bak", "stale")
+  os.rename = function(from, to)
+    if app.fs.isFile(to) then return nil, from .. ": File exists" end
+    return realRename(from, to)
+  end
+  d.fps = 60
+  local okStale, staleWhy = Util.writeJson(path, d)
+  os.rename = realRename
+  local fresh = M.loadLibrary().clips.Dup
+  check(okStale and fresh and fresh.fps == 60 and not app.fs.isFile(path .. ".bak"),
+        "write replaces a clip despite a stale backup (" .. tostring(staleWhy) .. ")")
+
+  -- A backup with no clip file beside it (a save cut short between its two moves) is listed.
+  local lone = Util.deepCopy(run)
+  lone.name = "Lone"
+  Util.writeJson(app.fs.joinPath(dir, "Lone.json.bak"), lone)
+  local loneListed = false
+  for _, sk in ipairs(M.loadLibrary().skipped) do
+    if sk.file == "Lone.json.bak" and sk.reason:find("rename", 1, true) and #sk.reason <= 60 then
+      loneListed = true
+    end
+  end
+  check(loneListed, "library: a backup left without its clip file is listed as skipped")
+  os.remove(app.fs.joinPath(dir, "Lone.json.bak"))
+
+  -- Long names save: the file name is cut to fit, on a character boundary.
+  local longAscii, longCjk = string.rep("a", 300), string.rep("日", 120)
+  for _, name in ipairs({ longAscii, longCjk }) do
+    local file = Clip.fileName(name, 99)
+    check(#file <= 240 and utf8.len(file) ~= nil,
+          "file name: a long name is cut to fit, whole characters (" .. #file .. " bytes)")
+    local p = M.clipSavePath(M.loadLibrary(), name)
+    local long = Util.deepCopy(run)
+    long.name = name
+    local okLong, longWhy = Util.writeJson(p, long)
+    local loaded = M.loadLibrary().clips[name]
+    check(okLong and loaded ~= nil, "a long name saves and loads (" .. tostring(longWhy) .. ")")
+  end
+  local p2 = M.clipSavePath(M.loadLibrary(), longAscii .. "b")
+  check(app.fs.fileName(p2) ~= app.fs.fileName(M.loadLibrary().clips[longAscii].file),
+        "two long names sharing a cut get separate files (" .. #app.fs.fileName(p2) .. " bytes)")
+  M.userClipsDir = userDir
+end
+
 local function settings(over)
   local s = Util.merge(Ghost.DEFAULTS, over or {})
   return s

@@ -126,6 +126,8 @@ M.userClipsDir = function() return app.fs.joinPath(out, "userclips") end
 local brokenClip = app.fs.joinPath(M.userClipsDir(), "broken.json")
 do
   app.fs.makeAllDirectories(M.userClipsDir())
+  -- Start from an empty folder: clips saved by an earlier run would make a save ask (#7).
+  for _, f in ipairs(app.fs.listFiles(M.userClipsDir())) do os.remove(app.fs.joinPath(M.userClipsDir(), f)) end
   local data = M.Util.readJson(app.fs.joinPath(root, "clips", "run.json"))
   data.name, data.rig = "Broken", "nope"
   M.Util.writeJson(brokenClip, data)
@@ -341,8 +343,70 @@ other:close()
 -- save clip
 set("clipName", "Run test")
 click("saveClip")
-check(app.fs.isFile(app.fs.joinPath(out, "userclips", "Run test.json")), "clip saved to user dir")
+local savedFile = app.fs.joinPath(M.userClipsDir(), "Run_test.json")
+check(app.fs.isFile(savedFile), "clip saved to user dir")
 check(widgets.clip.value == "Run test", "clip combobox switched to saved clip")
+
+-- Saving never silently overwrites another clip (#7). app.alert is stubbed: it records the text
+-- and answers with `answer` (1 = Replace, 2 = Cancel), as a real alert returns the button index.
+do
+  local alerts, answer = {}, 2
+  rawset(app, "alert", function(t) table.insert(alerts, type(t) == "table" and t.text or t); return answer end)
+  local function readText(path)
+    local f = io.open(path, "r")
+    local text = f and f:read("a")
+    if f then f:close() end
+    return text
+  end
+  local function hasName(name)
+    for _, n in ipairs(widgets.clip.options) do if n == name then return true end end
+    return false
+  end
+  local function saveAs(name) set("clipName", name); click("saveClip") end
+
+  local before = readText(savedFile)
+  set("ease", "Hold")
+  check(widgets.dirtyInfo.value:find("Edited", 1, true) ~= nil, "spacing edit before saving again")
+  saveAs("Run test")
+  check(#alerts == 1 and alerts[1] == "Replace your clip 'Run test'?",
+        "saving over a user clip asks first: " .. tostring(alerts[1]))
+  check(readText(savedFile) == before, "cancel leaves the saved clip unchanged")
+  answer = 1
+  saveAs("Run test")
+  check(#alerts == 2 and readText(savedFile) ~= before, "replace overwrites the saved clip")
+  local shown = M.loadLibrary().clips["Run test"]
+  local held = false
+  for _, m in ipairs(shown and shown.marks or {}) do if m.ease == "Hold" then held = true end end
+  check(shown and held and shown.file == savedFile and widgets.clip.value == "Run test"
+        and widgets.dirtyInfo.value == "Clip unchanged",
+        "the saved clip is the one the library shows afterwards")
+
+  -- Names that used to share a file: each gets its own, and saving one asks nothing.
+  local n0 = #alerts
+  for _, name in ipairs({ "Run/test", "日本", "中文" }) do saveAs(name) end
+  check(#alerts == n0, "new names save without asking (" .. (#alerts - n0) .. " alerts)")
+  check(hasName("Run test") and hasName("Run/test") and hasName("日本") and hasName("中文"),
+        "colliding and non-ASCII names are separate clips")
+  local lib = M.loadLibrary()
+  check(lib.clips["Run test"].file == savedFile
+        and lib.clips["Run/test"].file == app.fs.joinPath(M.userClipsDir(), "Run_test (2).json"),
+        "'Run/test' beside 'Run test' saved as Run_test (2).json")
+
+  -- A failed write shows a message instead of raising.
+  local userDir = M.userClipsDir
+  local notDir = app.fs.joinPath(out, "notadir")
+  local f = io.open(notDir, "w"); f:write("x"); f:close()
+  M.userClipsDir = function() return notDir end
+  n0 = #alerts
+  local okClick, err = pcall(saveAs, "Elsewhere")
+  M.userClipsDir = userDir
+  os.remove(notDir)
+  check(okClick, "failed write does not raise " .. tostring(err or ""))
+  check(#alerts == n0 + 1 and tostring(alerts[#alerts]):find("Could not save clip 'Elsewhere': Elsewhere.json: ", 1, true) ~= nil,
+        "failed write shows a message: " .. tostring(alerts[#alerts]))
+  check(widgets.clip.value == "中文", "failed write keeps the current clip")
+  rawset(app, "alert", nil)
+end
 
 -- scope switch to tag
 set("scope", "idle")
