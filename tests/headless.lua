@@ -190,6 +190,58 @@ do
   spr:close()
 end
 
+-- Apply and Remove leave the artist where they were (#3): a 3-frame sprite, frame 1 and an art
+-- layer active, a 5-frame ghost that adds frames; then the same with another sprite active.
+-- Apply still adds frames by default; ADR-0005 puts that behind an option (#27), which will
+-- turn it on here.
+do
+  local other = Sprite(32, 32, ColorMode.RGB)
+  other:newEmptyFrame(2); other:newEmptyFrame(3)
+  local otherLayer = other.layers[1]
+  local spr = Sprite(64, 64, ColorMode.RGB)
+  spr:newEmptyFrame(2); spr:newEmptyFrame(3)
+  local art = spr.layers[1]
+  local top = spr:newLayer()
+  top.name = "Top"
+  app.sprite = spr; app.layer = art; app.frame = 1
+
+  local function where()
+    return string.format("sprite %s, layer %s, frame %s",
+      app.sprite == spr and "spr" or (app.sprite == other and "other" or "?"),
+      app.layer and app.layer.name or "nil", app.frame and app.frame.frameNumber or "nil")
+  end
+
+  local s = settings { frames = 5, height = 40, groundY = 60, cx = 32 }
+  check(Ghost.apply(spr, s, lib.clips.Run, rig) == nil and #spr.frames == 5, "apply adds frames to 5")
+  check(app.sprite == spr and app.layer == art and app.frame.frameNumber == 1,
+        "apply keeps the active sprite, layer and frame (" .. where() .. ")")
+
+  app.sprite = other; app.layer = otherLayer; app.frame = 3
+  local s2 = settings { frames = 8, height = 40, groundY = 60, cx = 32, scope = Ghost.ALL }
+  check(Ghost.apply(spr, s2, lib.clips.Run, rig) == nil and #spr.frames == 8 and #other.frames == 3,
+        "apply with another sprite active writes only the given sprite")
+  check(app.sprite == other and app.layer == otherLayer and app.frame.frameNumber == 3,
+        "apply with another sprite active keeps it active (" .. where() .. ")")
+  local tag = spr:newTag(2, 3)
+  tag.name = "walk"
+  check(Ghost.apply(spr, settings { scope = "walk", frames = 2 }, lib.clips.Run, rig) == nil
+        and Ghost.findLayer(spr, "walk") ~= nil and #other.layers == 1,
+        "a new ghost layer goes on the given sprite, not the active one")
+  check(app.sprite == other and app.layer == otherLayer and app.frame.frameNumber == 3,
+        "a new ghost layer keeps the other sprite active (" .. where() .. ")")
+
+  Ghost.remove(spr, "walk")
+  check(Ghost.findLayer(spr, "walk") == nil and app.sprite == other and app.layer == otherLayer
+        and app.frame.frameNumber == 3, "remove keeps the other sprite active (" .. where() .. ")")
+
+  app.sprite = spr; app.layer = Ghost.findLayer(spr, Ghost.ALL); app.frame = 2
+  local removed = pcall(Ghost.remove, spr, Ghost.ALL)
+  check(removed and Ghost.findLayer(spr, Ghost.ALL) == nil and app.sprite == spr and app.frame.frameNumber == 2,
+        "remove with its own ghost layer active keeps the sprite and frame (" .. where() .. ")")
+  spr:close()
+  other:close()
+end
+
 do
   local spr = Sprite(48, 48, ColorMode.INDEXED)
   local s = settings { height = 40, groundY = 46, cx = 24 }

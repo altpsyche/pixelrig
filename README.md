@@ -19,7 +19,7 @@ Tested on a current Aseprite source build (Lua API version 41) and on Aseprite v
 
 ## Ghost Reference
 
-View → Ghost Reference... opens a dialog with an animated preview over your art. Nothing touches the sprite until **Apply**, which writes one undo step: a reference layer (never exported) with one ghost pose per frame.
+View → Ghost Reference... opens a dialog with an animated preview over your art. Nothing touches the sprite until **Apply**, which writes one undo step: a reference layer (never exported) with one ghost pose per frame. Apply and Remove leave your active sprite, layer and frame where they were, even when another sprite is active.
 
 **Preview.** Play, scrub, step frames. Your art is drawn under the ghost so you can line them up.
 
