@@ -27,10 +27,42 @@ function Util.readJson(path)
   return Util.decode(text)
 end
 
+-- Writes data as JSON. Returns true, or nil and why (one line: file name and reason); never
+-- raises. Writes a temporary file first and moves it into place, so a failed write leaves the
+-- file that was there as it was. Creates missing folders.
 function Util.writeJson(path, data)
-  local f = assert(io.open(path, "w"))
-  f:write(json.encode(data))
-  f:close()
+  local tmp = path .. ".tmp"
+  local ok, err = pcall(function()
+    local text = json.encode(data)
+    app.fs.makeAllDirectories(app.fs.filePath(path))
+    local f, openErr = io.open(tmp, "w")
+    if not f then error(openErr, 0) end
+    local wrote, writeErr = f:write(text)
+    local closed, closeErr = f:close()
+    if not (wrote and closed) then error(writeErr or closeErr, 0) end
+    local moved, moveErr = os.rename(tmp, path)
+    -- Windows will not rename onto an existing file: move the old one aside to a backup, move
+    -- the new one in, then drop the backup. If the new one cannot move in, the backup goes back,
+    -- so one version always survives.
+    if not moved and app.fs.isFile(path) then
+      local bak = path .. ".bak"
+      -- A backup already there is stale (left by a save cut short): the file at path is newer.
+      if app.fs.isFile(bak) then os.remove(bak) end
+      if os.rename(path, bak) then
+        moved, moveErr = os.rename(tmp, path)
+        if moved then os.remove(bak) else os.rename(bak, path) end
+      end
+    end
+    if not moved then error(moveErr, 0) end
+  end)
+  if ok then return true end
+  if app.fs.isFile(tmp) then os.remove(tmp) end
+  -- io's reasons start with the full path; the file name is enough on one line.
+  local why = tostring(err)
+  for _, prefix in ipairs({ tmp .. ": ", path .. ": " }) do
+    if why:sub(1, #prefix) == prefix then why = why:sub(#prefix + 1) end
+  end
+  return nil, app.fs.fileName(path) .. ": " .. why
 end
 
 function Util.deepCopy(v)

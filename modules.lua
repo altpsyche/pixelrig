@@ -18,7 +18,8 @@ return function(dir)
 
   function M.rigsDir() return app.fs.joinPath(dir, "rigs") end
 
-  -- Built-in clips + user clips (user dir wins on name clash only if not built-in).
+  -- Built-in clips + user clips. A user clip named like a built-in is skipped; of two user files
+  -- with one clip name, the first by file name loads and the other is skipped.
   -- A file that cannot be used is left out and listed in lib.skipped as { file, origin, reason },
   -- the reason one short line for the artist; loading itself never raises.
   function M.loadLibrary()
@@ -38,19 +39,37 @@ return function(dir)
     end
     local function scan(folder, origin)
       if not app.fs.isDirectory(folder) then return end
-      for _, file in ipairs(app.fs.listFiles(folder)) do
+      -- Name order, so which of two files with one clip name loads never depends on the disk.
+      local files = app.fs.listFiles(folder)
+      table.sort(files)
+      for _, file in ipairs(files) do
+        -- A backup Util.writeJson left with no clip file beside it: a save cut short. Never
+        -- restored here, as the newer data may sit in the .tmp; the artist decides.
+        local backupOf = origin == "user" and file:match("^(.+%.json)%.bak$")
+        if backupOf and not app.fs.isFile(app.fs.joinPath(folder, backupOf)) then
+          table.insert(lib.skipped, { file = file, origin = origin,
+                                      reason = "a save did not finish: rename it to .json" })
+        end
         if file:match("%.json$") then
           local function skip(reason)
             table.insert(lib.skipped, { file = file, origin = origin, reason = reason })
           end
-          local ok, clip = pcall(M.Clip.load, app.fs.joinPath(folder, file), origin)
+          local path = app.fs.joinPath(folder, file)
+          local ok, clip = pcall(M.Clip.load, path, origin)
           local rigReason = ok and needRig(clip.rig)
+          local have = ok and lib.clips[clip.name]
           if not ok then
             skip(tostring(clip))
           elseif rigReason then
             skip(rigReason)
-          elseif not (lib.clips[clip.name] and lib.clips[clip.name].origin == "builtin") then
-            if not lib.clips[clip.name] then table.insert(lib.names, clip.name) end
+          elseif have and origin == "user" and have.origin == "builtin" then
+            skip("same clip name as a built-in")
+          elseif have and origin == "user" then
+            -- Never let a second file silently replace the first (#7).
+            skip("same clip name as " .. app.fs.fileName(have.file))
+          elseif not have or have.origin ~= "builtin" then
+            if not have then table.insert(lib.names, clip.name) end
+            clip.file = path
             lib.clips[clip.name] = clip
           end
         end
@@ -60,6 +79,33 @@ return function(dir)
     scan(M.userClipsDir(), "user")
     table.sort(lib.names)
     return lib
+  end
+
+  -- Where saving a clip named `name` writes, and what that replaces: nil when nothing, else a
+  -- short phrase for the question. An existing user clip is saved over its own file, so the saved
+  -- clip is the one the library shows afterwards. Any other name gets Clip.fileName, numbered past
+  -- every file holding another clip or none; names are compared lowercased, as a disk that ignores
+  -- case would. A file there holding this very name (one that did not load) is replaced.
+  function M.clipSavePath(lib, name)
+    local have = lib.clips[name]
+    if have and have.origin == "user" then return have.file, "your clip '" .. name .. "'" end
+    local folder = M.userClipsDir()
+    local taken = {}
+    if app.fs.isDirectory(folder) then
+      for _, file in ipairs(app.fs.listFiles(folder)) do taken[file:lower()] = file end
+    end
+    local n = 1
+    while true do
+      local file = M.Clip.fileName(name, n)
+      local there = taken[file:lower()]
+      if not there then return app.fs.joinPath(folder, file), nil end
+      local path = app.fs.joinPath(folder, there)
+      local ok, data = pcall(M.Util.readJson, path)
+      if ok and type(data) == "table" and data.name == name then
+        return path, "your clip '" .. name .. "' (" .. there .. ")"
+      end
+      n = n + 1
+    end
   end
 
   M.Sections = mod("sections")
