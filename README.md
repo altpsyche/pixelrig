@@ -8,7 +8,7 @@ Open source (MIT). Built for solo and indie pixel artists, tuned for characters 
 
 Download the latest `.aseprite-extension` from [Releases](https://github.com/altpsyche/pixelrig/releases), then double-click it or use **Edit > Preferences > Extensions > Add Extension**. Open a sprite and go to **View > Ghost Reference...**
 
-Tested on a current Aseprite source build (Lua API version 41). Recent 1.3.x releases should work; older ones may lack APIs it uses (dialog tabs, canvas mouse events, layer properties).
+Tested on a current Aseprite source build (Lua API version 41) and on Aseprite v1.3-rc6 (Lua API 25). Where Aseprite has no dialog tabs (v1.3-rc6), the dialog shows a **Section** picker instead, with each tab's parts as their own sections: Motion, Clip, Travel, Body, Place, Look, Colors, Pose.
 
 ## Status
 
@@ -26,14 +26,14 @@ View → Ghost Reference... opens a dialog with an animated preview over your ar
 **Motion tab.**
 - Clip (Run built in, plus your saved clips) and Range: *All frames* or any tag. Each range gets its own ghost layer, so a sprite can hold a run ghost on `run` and another on `sprint`.
 - Frames, FPS, loop over range, set frame durations, key pose tags.
-- Clip sliders (Run: stride, knee drive, bounce, lean, arm swing).
-- Travel: root motion that locks planted feet (no foot slide), footprints and ground line to check it.
+- Under **Clip**, the clip's sliders (Run: stride, knee drive, bounce, lean, arm swing).
+- Under **Travel**, root motion that locks planted feet (no foot slide), footprints and ground line to check it.
 
 **Body tab.** Presets (Default, Heroic, Chibi, Stocky) or custom head / torso / arms / legs / bulk. Facing.
 
 **Place tab.** Fit to art: uses the selection, else the active layer, else all visible art. Height, ground line, center X. A new ghost auto-fits on first open.
 
-**Look tab.** Stick, Capsule, Joints + arcs. Line width, pixel-perfect 1px lines, opacity. Color schemes, each with its own pickers (picks are kept per scheme; Reset colors restores defaults):
+**Look tab.** Stick, Capsule, Joints + arcs. Line width, pixel-perfect 1px lines, opacity. Under **Colors**, color schemes, each with its own pickers (picks are kept per scheme; Reset colors restores defaults):
 
 | Scheme | Pickers |
 | --- | --- |
