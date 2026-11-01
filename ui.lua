@@ -231,12 +231,18 @@ return function(M)
 
     -- Ghost.apply writes this dialog's sprite and leaves the artist's active sprite, layer and
     -- frame as they were (#3). `clicked`: the artist pressed Apply, the one case that alerts when
-    -- the sprite is closed.
+    -- the sprite is closed or its palette has no visible color for the ghost; auto-apply stays
+    -- silent then, so it does not raise an alert on every change.
     local function applyNow(clicked)
       if not alive() then
         if clicked then
           app.alert("The sprite this Ghost Reference was opened for is closed. Reopen the dialog on an open sprite.")
         end
+        return
+      end
+      local note = Ghost.cannotDraw(sprite)
+      if note then
+        if clicked then app.alert(note) end
         return
       end
       pull()

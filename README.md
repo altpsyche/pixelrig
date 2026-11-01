@@ -47,6 +47,8 @@ View → Ghost Reference... opens a dialog with an animated preview over your ar
 
 Settings persist on the ghost layer: reopen the dialog with the ghost layer selected and everything comes back.
 
+Color modes: on an indexed sprite each ghost color is drawn with the nearest visible palette entry, never the transparent index, and the palette is left as it is, so a scheme color can come out as a different shade; when the palette has no visible color besides the transparent one, Apply writes nothing and says so in a one-line note (auto-apply stays silent). A grayscale sprite draws each color as its gray.
+
 Pixel quality: the figure snaps to whole pixels as one unit (no 1px wobble), 1px chains drop L-corner doubles, small heads use hand-shaped circle stamps.
 
 ### Clips
