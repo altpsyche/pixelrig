@@ -1,0 +1,14 @@
+# **List PRs** in docs/agents/issue-tracker.md: open PRs carrying one label, oldest first, each with
+# its newest comments, and the logged-in account for **Whose comments count**.
+query($owner: String!, $repo: String!, $label: String!) {
+  viewer { login }
+  repository(owner: $owner, name: $repo) {
+    pullRequests(states: OPEN, labels: [$label], first: 100, orderBy: { field: CREATED_AT, direction: ASC }) {
+      nodes {
+        number
+        title
+        comments(last: 100) { nodes { body author { login } } }
+      }
+    }
+  }
+}

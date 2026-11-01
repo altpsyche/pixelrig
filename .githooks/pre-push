@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Runs scripts/verify.sh before every push and blocks the push if it fails, so red work never
+# leaves this machine. verify.sh checks the working tree, so the hook first refuses a tree with any
+# change or untracked file (ignored files excepted): verify.sh then checks the committed HEAD, which
+# is what a push of the current branch sends. Switched on by scripts/install-hooks.sh. Who may skip
+# it: AGENTS.md § Anti-Patterns.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+dirty="$(git status --porcelain)"
+if [ -n "$dirty" ]; then
+  echo "pre-push: the working tree has uncommitted changes or untracked files;" \
+    "commit or stash them first. Push blocked." >&2
+  exit 1
+fi
+if ! scripts/verify.sh </dev/null; then
+  echo "pre-push: scripts/verify.sh failed; push blocked." >&2
+  exit 1
+fi

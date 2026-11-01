@@ -6,7 +6,7 @@ Open source (MIT). Built for solo and indie pixel artists, tuned for characters 
 
 ## Install
 
-Download the latest `.aseprite-extension` from [Releases](../../releases), then double-click it or use **Edit > Preferences > Extensions > Add Extension**. Open a sprite and go to **View > Ghost Reference...**
+Download the latest `.aseprite-extension` from [Releases](https://github.com/altpsyche/pixelrig/releases), then double-click it or use **Edit > Preferences > Extensions > Add Extension**. Open a sprite and go to **View > Ghost Reference...**
 
 Tested on a current Aseprite source build (Lua API version 41). Recent 1.3.x releases should work; older ones may lack APIs it uses (dialog tabs, canvas mouse events, layer properties).
 
@@ -76,7 +76,15 @@ Skeleton proportions live in `rigs/<name>.json`, normalized to standing height.
 
 ## Development
 
+PixelRig is built mostly by AI agents steered by one owner, using the
+[altpsyche agentic engineering](https://github.com/altpsyche/altpsyche-agentic-engineering) workflow.
+Start with [`AGENTS.md`](AGENTS.md): it holds the constitution, where things live and how work is
+planned, built and reviewed. [`docs/idea.md`](docs/idea.md) is the source of truth for scope and
+roadmap.
+
 ```sh
+scripts/install-hooks.sh                       # once per clone: pre-push runs verify.sh
+ASEPRITE=/path/to/aseprite scripts/verify.sh   # everything CI runs, plus the Aseprite tests
 tools/dev-install.sh               # link checkout into ~/.config/aseprite/extensions/pixelrig
 tools/test.sh /path/to/aseprite    # headless tests + render sheets in tests/out/
 tools/package.sh                   # build dist/*.aseprite-extension and dist/*.zip

@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# PixelRig's project checks, run by scripts/verify.sh (and so by CI and the pre-push hook).
+#   tools/check.sh                       Lua syntax, clip/rig JSON, release archive
+#   ASEPRITE=/path/to/aseprite tools/check.sh   plus the Aseprite batch tests
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+# Lua: every extension and test file compiles. Aseprite embeds Lua 5.4, so prefer luac5.4.
+luac_bin="$(command -v luac5.4 || command -v luac || true)"
+if [ -n "$luac_bin" ]; then
+  "$luac_bin" -p ./*.lua tests/*.lua
+else
+  echo "verify: luac not found, Lua syntax check skipped (CI runs it)" >&2
+fi
+
+# Clips and rigs: every JSON file parses.
+if command -v node >/dev/null; then
+  node -e 'const fs = require("fs");
+    for (const f of process.argv.slice(1)) {
+      try { JSON.parse(fs.readFileSync(f, "utf8")); }
+      catch (e) { console.error(`verify: ${f}: ${e.message}`); process.exit(1); }
+    }' clips/*.json rigs/*.json
+fi
+
+# Release archive: package.json at its root, only the extension inside (tools/check-archive.sh).
+if command -v zip >/dev/null && command -v unzip >/dev/null; then
+  archive="$(tools/package.sh | grep '\.zip$')"
+  tools/check-archive.sh "$archive"
+  # Self-test: the guard refuses an archive carrying a file outside the extension.
+  bad="$(mktemp -d)/bad.zip"
+  cp "$archive" "$bad"
+  zip -q "$bad" AGENTS.md
+  if tools/check-archive.sh "$bad" 2>/dev/null; then
+    echo "verify: tools/check-archive.sh accepted an archive with AGENTS.md in it" >&2
+    exit 1
+  fi
+  rm -rf "$(dirname "$bad")"
+else
+  echo "verify: zip/unzip not found, package check skipped (CI runs it)" >&2
+fi
+
+# Aseprite batch tests: build, render, apply (tests/headless.lua) and the dialog through a mock
+# (tests/ui_mock.lua). Needs an Aseprite binary: $ASEPRITE, or aseprite on PATH. CI has none.
+aseprite_bin="${ASEPRITE:-$(command -v aseprite || true)}"
+if [ -n "$aseprite_bin" ]; then
+  if ! test_log="$(tools/test.sh "$aseprite_bin" 2>&1)"; then
+    grep -E 'FAIL|rror' <<<"$test_log" >&2 || echo "$test_log" >&2
+    echo "verify: Aseprite tests failed" >&2
+    exit 1
+  fi
+else
+  echo "verify: no Aseprite binary (set ASEPRITE), Aseprite tests skipped" >&2
+fi

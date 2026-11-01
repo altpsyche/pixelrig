@@ -1,0 +1,7 @@
+# Findings gitleaks may skip, one fingerprint per line. Each needs a reason; a real secret is never
+# ignored here, it is rotated and then removed from history.
+#
+# The fake key 'tsk-test-0123456789' in test files deleted by edf43ef.
+7a28d6aa852accf95b8870f18f22e81d204ef590:scripts/jev/triage.test.mjs:generic-api-key:109
+7a28d6aa852accf95b8870f18f22e81d204ef590:scripts/jev/verify.test.mjs:generic-api-key:267
+7a28d6aa852accf95b8870f18f22e81d204ef590:scripts/jev/prune.test.mjs:generic-api-key:367
