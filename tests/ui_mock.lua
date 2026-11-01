@@ -120,7 +120,9 @@ check(ok, "dialog opens " .. tostring(err or ""))
 if not ok then error(err) end
 
 check(widgets.height.value == 40 and widgets.groundY.value == 59, "auto-fit on first open")
-check(widgets.param1.visible == true and widgets.param6.visible == false and widgets.param1.value == 100,
+-- (in picker mode the sliders sit in the Clip section, checked below)
+check((NOTABS or (widgets.param1.visible == true and widgets.param6.visible == false))
+      and widgets.param1.label == "Stride %" and widgets.param1.value == 100,
       "param sliders relabelled for Run")
 
 -- paint
@@ -161,11 +163,17 @@ check(widgets.preset.value == "Custom", "manual proportion -> Custom")
 -- sections: tabs when the Dialog has them, else a section picker (#40)
 if NOTABS then
   check(widgets.section ~= nil and widgets.tabMotion == nil, "no tabs: section picker instead of tabs")
-  check(widgets.param1.visible and not widgets.c1.visible and not widgets.style.visible,
+  local opts = table.concat(widgets.section.options, ",")
+  check(opts == "Motion,Clip,Travel,Body,Place,Look,Colors,Pose", "no tabs: one short section per part (" .. opts .. ")")
+  check(widgets.clip.visible and not widgets.param1.visible and not widgets.travel.visible
+        and not widgets.c1.visible and not widgets.style.visible,
         "no tabs: only the Motion section is shown")
-  set("section", "Look")
-  check(widgets.style.visible and widgets.c1.visible and not widgets.c2.visible and not widgets.param1.visible,
-        "no tabs: Look shown, Motion hidden, color slots keep their own visibility")
+  set("section", "Clip")
+  check(widgets.param1.visible and widgets.param5.visible and not widgets.param6.visible and not widgets.clip.visible,
+        "no tabs: Clip shows this clip's param sliders only")
+  set("section", "Colors")
+  check(widgets.c1.visible and not widgets.c2.visible and not widgets.style.visible and not widgets.param1.visible,
+        "no tabs: Colors shown, others hidden, color slots keep their own visibility")
 else
   check(widgets.tabMotion ~= nil and widgets.section == nil, "tabs: dialog uses tabs")
 end
@@ -183,9 +191,9 @@ click("resetColors")
 check(widgets.c2.value.red == 255, "reset colors restores scheme defaults")
 set("colorScheme", "Segments")
 if NOTABS then
-  set("section", "Motion")
+  set("section", "Clip")
   check(not widgets.c8.visible and widgets.param1.visible and not widgets.param6.visible,
-        "no tabs: back to Motion hides colors, param sliders keep their own visibility")
+        "no tabs: back to Clip hides colors, param sliders keep their own visibility")
 end
 
 set("style", "Joints + arcs"); set("travel", true)

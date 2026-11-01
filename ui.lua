@@ -493,7 +493,10 @@ return function(M)
       playTimer:stop(); changeTimer:stop(); applyTimer:stop()
     end }
 
-    dlg:canvas { id = "preview", width = CW, height = CH,
+    -- Without tabs (v1.3-rc6) every section is a separate page; a shorter preview keeps the
+    -- dialog on screen at 200% UI scale.
+    local previewH = M.Sections.hasTabs(dlg) and CH or 160
+    dlg:canvas { id = "preview", width = CW, height = previewH,
                  onpaint = onPaint, onmousedown = onMouseDown, onmousemove = onMouseMove, onmouseup = onMouseUp }
     dlg:button { id = "prev", text = "<", onclick = function() stopPlay(); setFrame((cur - 2) % build.N + 1) end }
     dlg:button { id = "play", text = "Play", onclick = function()
@@ -512,13 +515,18 @@ return function(M)
                  onchange = function() stopPlay(); setFrame(dlg.data.frame) end }
 
     sec = M.Sections.new(dlg, {
-      { id = "tabMotion", text = "Motion" }, { id = "tabBody", text = "Body" },
-      { id = "tabPlace", text = "Place" }, { id = "tabLook", text = "Look" },
-      { id = "tabPose", text = "Pose" },
+      { id = "tabMotion", text = "Motion", parts = {
+        { id = "secMotion", text = "Motion" }, { id = "secClip", text = "Clip" },
+        { id = "secTravel", text = "Travel" } } },
+      { id = "tabBody", text = "Body", parts = { { id = "secBody", text = "Body" } } },
+      { id = "tabPlace", text = "Place", parts = { { id = "secPlace", text = "Place" } } },
+      { id = "tabLook", text = "Look", parts = {
+        { id = "secLook", text = "Look" }, { id = "secColors", text = "Colors" } } },
+      { id = "tabPose", text = "Pose", parts = { { id = "secPose", text = "Pose" } } },
     })
     local W = sec.widgets
 
-    sec:begin("tabMotion")
+    sec:begin("secMotion")
     W:combobox { id = "clip", label = "Clip", option = work.name, options = lib.names, onchange = onClipChange }
     W:combobox { id = "scope", label = "Range", option = S.scope, options = Ghost.scopes(sprite), onchange = onScopeChange }
     W:slider { id = "frames", label = "Frames", min = 2, max = 48, value = S.frames, onchange = changed }
@@ -526,17 +534,17 @@ return function(M)
     W:check { id = "fillAll", label = "Frames", text = "Loop over range", selected = S.fillAll, onclick = changed }
     W:check { id = "timing", text = "Set frame durations", selected = S.timing, onclick = changed }
     W:check { id = "labels", text = "Key pose tags", selected = S.labels, onclick = changed }
-    W:separator { text = "Clip" }
+    sec:begin("secClip")
     for i = 1, MAXP do
       W:slider { id = "param" .. i, label = "Param", min = 0, max = 100, value = 0, visible = false, onchange = changed }
     end
-    W:separator { text = "Travel" }
+    sec:begin("secTravel")
     W:check { id = "travel", label = "Root", text = "Travel (no foot slide)", selected = S.travel, onclick = changed }
     W:slider { id = "travelSpeed", label = "Speed %", min = 0, max = 200, value = S.travelSpeed, onchange = changed }
     W:check { id = "footprints", text = "Footprints", selected = S.footprints, onclick = changed }
     W:check { id = "groundLine", text = "Ground line", selected = S.groundLine, onclick = changed }
 
-    sec:begin("tabBody")
+    sec:begin("secBody")
     W:combobox { id = "preset", label = "Preset", option = S.preset or "Default", options = presetNames(), onchange = onPresetChange }
     W:slider { id = "pHead", label = "Head %", min = 50, max = 250, value = S.proportions.head, onchange = onProportion }
     W:slider { id = "pTorso", label = "Torso %", min = 50, max = 200, value = S.proportions.torso, onchange = onProportion }
@@ -545,16 +553,17 @@ return function(M)
     W:slider { id = "pBulk", label = "Bulk %", min = 50, max = 250, value = S.proportions.bulk, onchange = onProportion }
     W:combobox { id = "facing", label = "Facing", option = S.facing, options = { "Right", "Left" }, onchange = changed }
 
-    sec:begin("tabPlace")
+    sec:begin("secPlace")
     W:button { id = "fit", text = "Fit to art (selection / layer)", onclick = onFit }
     W:slider { id = "height", label = "Height px", min = 8, max = max(16, sprite.height * 2), value = S.height, onchange = changed }
     W:slider { id = "groundY", label = "Ground Y", min = 0, max = sprite.height - 1, value = S.groundY, onchange = changed }
     W:slider { id = "cx", label = "Center X", min = 0, max = sprite.width, value = S.cx, onchange = changed }
 
-    sec:begin("tabLook")
+    sec:begin("secLook")
     W:combobox { id = "style", label = "Style", option = S.style, options = Render.STYLES, onchange = changed }
     W:slider { id = "thickness", label = "Line px", min = 1, max = 8, value = S.thickness, onchange = changed }
     W:check { id = "pixelPerfect", text = "Pixel-perfect 1px lines", selected = S.pixelPerfect, onclick = changed }
+    sec:begin("secColors")
     W:combobox { id = "colorScheme", label = "Colors", option = S.colorScheme, options = M.Colors.SCHEMES, onchange = onSchemeChange }
     for i = 1, M.Colors.MAX_SLOTS do
       W:color { id = "c" .. i, label = "Color", color = Color { r = 0, g = 0, b = 0 }, visible = false, onchange = changed }
@@ -567,7 +576,7 @@ return function(M)
     W:slider { id = "opacity", label = "Opacity %", min = 5, max = 100, value = S.opacity, onchange = changed }
     W:check { id = "showArt", text = "Show art in preview", selected = S.showArt ~= false, onclick = changed }
 
-    sec:begin("tabPose")
+    sec:begin("secPose")
     W:label { id = "help", label = "Edit", text = "Pause, drag joints in preview." }
     W:label { id = "help2", text = "Far limbs share near curves (half cycle)." }
     W:label { id = "segment", label = "Segment", text = "" }
