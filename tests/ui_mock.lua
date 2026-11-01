@@ -63,6 +63,7 @@ function mock:modify(t)
   if t.visible ~= nil then w.visible = t.visible end
   if t.label ~= nil then w.label = t.label end
   if t.color ~= nil then w.value = t.color end
+  if t.enabled ~= nil then w.enabled = t.enabled end
   if w.kind == "slider" and (w.value < w.min or w.value > w.max) then
     error(t.id .. " value " .. w.value .. " outside " .. w.min .. ".." .. w.max)
   end
@@ -152,6 +153,12 @@ local openedMotionOnly = widgets.clip.visible and not (widgets.param1.visible or
   or widgets.ease.visible)
 
 check(widgets.height.value == 40 and widgets.groundY.value == 59, "auto-fit on first open")
+-- Adding frames is opt-in (ADR-0005, #27): off on a new ghost, and the dialog says how much of
+-- the 12-frame cycle fits the 1-frame sprite.
+check(widgets.addFrames and widgets.addFrames.value == false and widgets.addFrames.t.text == "Add frames",
+      "Add frames is off on a new ghost")
+check(widgets.fitInfo and widgets.fitInfo.visible and widgets.fitInfo.value == "1 of 12 cycle frames fit",
+      "the dialog says how much of the cycle fits: " .. tostring(widgets.fitInfo and widgets.fitInfo.value))
 check(widgets.skipped and widgets.skipped.visible
       and widgets.skipped.value == "broken.json: rig 'nope' not found",
       "skipped clip reason shown on one line: " .. tostring(widgets.skipped and widgets.skipped.value))
@@ -205,7 +212,7 @@ if NOTABS then
   check(openedMotionOnly, "no tabs: the dialog opens on the Motion section only")
   -- Every section shows exactly its own controls.
   local SECTIONS = {
-    Motion = { "clip", "skipped", "scope", "frames", "fps", "fillAll", "timing", "labels" },
+    Motion = { "clip", "skipped", "scope", "frames", "fps", "fillAll", "labels", "addFrames", "timing", "fitInfo" },
     Clip = { "param1", "param2", "param3", "param4", "param5" },
     Travel = { "travel", "travelSpeed", "footprints", "groundLine" },
     Body = { "preset", "pHead", "pTorso", "pArms", "pLegs", "pBulk", "facing" },
@@ -272,6 +279,16 @@ local layer = M.Ghost.findLayer(spr, M.Ghost.ALL)
 check(layer ~= nil, "apply creates ghost layer")
 local saved = M.Ghost.loadSettings(layer)
 check(saved and saved.clipData ~= nil and saved.style == "Joints + arcs", "edited clip + settings saved on layer")
+check(#spr.frames == 1 and saved.addFrames == false, "apply with Add frames off adds no frame (" .. #spr.frames .. ")")
+
+-- Ticking Add frames: the dialog says what Apply will add, and Apply adds it.
+set("addFrames", true)
+check(widgets.fitInfo.visible and widgets.fitInfo.value == "Apply adds 11 frames",
+      "with Add frames on the dialog says what Apply adds: " .. tostring(widgets.fitInfo.value))
+click("apply")
+check(#spr.frames == 12 and M.Ghost.loadSettings(layer).addFrames == true,
+      "apply with Add frames on adds frames to 12 and saves the option (" .. #spr.frames .. ")")
+check(not widgets.fitInfo.visible, "the fit line hides once the cycle fits")
 
 -- Another sprite active, its own layer and frame 3 (#3): Fit measures only the dialog's sprite,
 -- and Apply writes the dialog's sprite without leaving the artist on it.
@@ -308,6 +325,8 @@ check(widgets.clip.value == "Run test", "clip combobox switched to saved clip")
 -- scope switch to tag
 set("scope", "idle")
 check(widgets.scope.value == "idle", "scope switched to tag")
+check(widgets.addFrames.enabled == false and widgets.fitInfo.value == "1 of 2 cycle frames fit",
+      "a tag range disables Add frames and says how much fits: " .. tostring(widgets.fitInfo.value))
 click("apply")
 check(M.Ghost.findLayer(spr, "idle") ~= nil, "tag ghost applied")
 
@@ -316,7 +335,8 @@ os.remove(brokenClip)
 for k in pairs(widgets) do widgets[k] = nil end
 app.layer = layer
 M.UI.open()
-check(widgets.style.value == "Joints + arcs" and widgets.colorScheme.value == "Segments", "reopen restores settings")
+check(widgets.style.value == "Joints + arcs" and widgets.colorScheme.value == "Segments"
+      and widgets.addFrames.value == true and widgets.addFrames.enabled ~= false, "reopen restores settings, Add frames too")
 check(not widgets.skipped.visible, "no skipped line when every clip loads")
 
 -- Corrupt settings on the ghost layer: the dialog still opens, with defaults (#4).
@@ -336,6 +356,7 @@ end
 local opened, why = reopenWith(json.encode({ style = "Capsule", clip = "Run", clipData = { name = "Run" } }))
 check(opened and widgets.style.value == "Capsule" and widgets.dirtyInfo.value == "Clip unchanged",
       "corrupt edited clip in settings -> library clip " .. tostring(why or ""))
+check(widgets.addFrames.value == false, "a ghost saved without the option opens with Add frames off")
 
 -- Drag every joint on a clip without leg.thigh or arm.shoulder: nothing raises (#4).
 do
