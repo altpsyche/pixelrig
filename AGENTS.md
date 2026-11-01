@@ -30,7 +30,7 @@ data (a clip file), not code. Mirror these in `docs/workflow.md` § The constitu
 | ADRs — the WHY, decided | [`docs/adr/`](docs/adr/), named `NNNN-kebab-title.md` |
 | Specs — the WHAT | [`docs/specs/`](docs/specs/) |
 | How a part works — the HOW | a co-located `.md` beside the work it describes; the extension's module map is in [`README.md`](README.md) § Layout |
-| Vocabulary | `GLOSSARY.md`, created lazily by `/domain-modeling`. Until it exists, `docs/idea.md` § Core Concepts is the authority |
+| Vocabulary | [`GLOSSARY.md`](GLOSSARY.md), kept by `/domain-modeling` — authoritative |
 | Issues, PR state | **GitHub issues** — see [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md) |
 | Working checklist | [`TODO.md`](TODO.md), including later ideas not yet on the roadmap; `docs/idea.md` § Roadmap is authoritative and wins |
 | Local scratch, never authoritative | `.scratch/` (gitignored) |
