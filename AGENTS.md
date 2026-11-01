@@ -59,8 +59,8 @@ eval case parser over every case in `evals/`, the eval runner and cleanup script
 `gh`, and the Jev tools in [`scripts/jev/`](scripts/jev/README.md), the latter against a fake
 server, and scans every commit for secrets with gitleaks. Project checks: every `.lua` file
 compiles (`luac -p`), `tests/pure.lua` passes under plain Lua 5.4 (clip sampling, easing and key
-edits, rig solving, stamps, colors, render through a put callback), every clip and rig JSON
-parses, the release gate
+edits, rig solving and grounding, stamps, colors, render through a put callback), every clip and
+rig JSON parses, the release gate
 `tools/release-check.sh` passes its own test and every notes file in `docs/releases/`, the
 archive `tools/package.sh` builds holds only the extension with `package.json` at its root
 (`tools/check-archive.sh`, with a self-test), and, when an Aseprite binary is found

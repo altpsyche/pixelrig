@@ -1,11 +1,11 @@
 -- Pure-Lua tests: plain Lua 5.4, no Aseprite (#12). CI runs them through tools/check.sh.
---   lua5.4 tests/pure.lua [-v]     (from any folder; -v prints passing checks too)
+--   lua5.4 tests/pure.lua [-v]     (from any folder, by path; -v prints passing checks too)
 -- Covers the modules that need no `app`: clip sampling, easing and key edits, rig solving and
 -- grounding, stamps, colors, and render output through a put callback. Aseprite's `json` global
 -- is absent here, so a minimal decoder below reads the clip and rig files; it lives in this test
 -- only, never in shipped code.
 
-local root = (arg and arg[0] or ""):match("^(.*)[/\\]tests[/\\][^/\\]*$") or "."
+local root = ((arg and arg[0] or ""):match("^(.*)[/\\][^/\\]*$") or ".") .. "/.."
 local verbose = arg and arg[1] == "-v"
 
 local failures, passes = 0, 0
@@ -72,11 +72,12 @@ local function decode(text)
         if d ~= "," then fail("expected ',' or '}'") end
       end
     elseif c == "[" then
-      local t = {}
+      local t, n = {}, 0
       pos = pos + 1; ws()
       if text:sub(pos, pos) == "]" then pos = pos + 1; return t end
       while true do
-        t[#t + 1] = value()
+        n = n + 1
+        t[n] = value()
         ws()
         local d = text:sub(pos, pos)
         pos = pos + 1
@@ -108,6 +109,7 @@ end
 
 do
   local v = decode('{"a": [1, -2.5, 3e2], "b": {"c": "x\\"y\\u0041"}, "d": true, "e": [], "f": null}')
+  check(decode("[1, null, 3]")[3] == 3, "test JSON decoder keeps positions after a null")
   check(v.a[1] == 1 and v.a[2] == -2.5 and v.a[3] == 300 and v.b.c == 'x"yA' and v.d == true
         and #v.e == 0 and v.f == nil, "test JSON decoder reads objects, arrays, numbers, strings")
   check(not pcall(decode, "{ not json"), "test JSON decoder rejects bad JSON")
@@ -189,7 +191,9 @@ do
   check(smoothOnKeys, "smooth (Catmull-Rom) passes through every key")
   local v = Clip.sample(s, 0.375)["a.x"]
   check(v > 4 and v < 10 and not near(v, 7, 1e-6), string.format("smooth curves between keys (%.4f)", v))
-  check(s.interp == "smooth" and near(Clip.sample(clip(), 0.375)["a.x"], 7.5), "linear differs from smooth")
+  local lin = Clip.clone(s)
+  lin.interp = "linear"
+  check(near(Clip.sample(lin, 0.375)["a.x"], 7) and not near(v, 7, 1e-6), "linear interp: straight between the same keys")
 
   local sided = clip {
     sided = { "leg" }, sideOffset = 0.25,
@@ -394,14 +398,13 @@ do
   end
 
   local stick, stickCalls, parts = draw("Stick")
-  local inBounds, whole = true, true
+  local inBounds = true
   for k in pairs(stick) do
-    local x, y = k:match("^(-?%d+),(-?%d+)$")
+    local x, y = k:match("^(-?%d+),(-?%d+)$") -- a float key such as "10.0" does not match
     x, y = tonumber(x), tonumber(y)
     if not x or x < 0 or x >= W or y < 0 or y >= H then inBounds = false end
-    if x and math.type(x) ~= "integer" then whole = false end
   end
-  check(stickCalls > 0 and inBounds and whole, "Stick: whole pixels, inside the canvas (" .. count(stick) .. " px)")
+  check(stickCalls > 0 and inBounds, "Stick: whole pixels, inside the canvas (" .. count(stick) .. " px)")
   check(parts["head/center"] and parts["thigh/near"] and parts["thigh/far"] and parts["forearm/near"],
         "color callback asked per part and side")
   local again = draw("Stick")
