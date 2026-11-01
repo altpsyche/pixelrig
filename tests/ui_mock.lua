@@ -35,7 +35,11 @@ end
 for _, k in ipairs({ "canvas", "button", "slider", "combobox", "check", "color", "label", "entry", "tab" }) do
   mock[k] = function(self, t) return add(k, t) end
 end
-function mock:separator() return self end
+-- Like Aseprite: a separator with an id can be modified; one without is not tracked.
+function mock:separator(t)
+  if type(t) == "table" and t.id then return add("separator", t) end
+  return self
+end
 function mock:endtabs(t) return add("endtabs", t) end
 function mock:show() return self end
 function mock:close() if self._onclose then self._onclose() end end
@@ -63,7 +67,12 @@ function mock:modify(t)
     error(t.id .. " value " .. w.value .. " outside " .. w.min .. ".." .. w.max)
   end
 end
+-- notabs=1: a Dialog like Aseprite v1.3-rc6 (Lua API 25), where reading tab/endtabs raises.
+local NOTABS = app.params.notabs == "1"
+if NOTABS then mock.tab, mock.endtabs = nil, nil end
+
 setmetatable(mock, { __index = function(_, k)
+  if NOTABS and (k == "tab" or k == "endtabs") then error("Field " .. k .. " does not exist") end
   if k == "data" then
     local d = {}
     for id, w in pairs(widgets) do d[id] = w.value end
@@ -149,6 +158,18 @@ check(widgets.pHead.value == 200, "preset applies proportions")
 set("pLegs", 90)
 check(widgets.preset.value == "Custom", "manual proportion -> Custom")
 
+-- sections: tabs when the Dialog has them, else a section picker (#40)
+if NOTABS then
+  check(widgets.section ~= nil and widgets.tabMotion == nil, "no tabs: section picker instead of tabs")
+  check(widgets.param1.visible and not widgets.c1.visible and not widgets.style.visible,
+        "no tabs: only the Motion section is shown")
+  set("section", "Look")
+  check(widgets.style.visible and widgets.c1.visible and not widgets.c2.visible and not widgets.param1.visible,
+        "no tabs: Look shown, Motion hidden, color slots keep their own visibility")
+else
+  check(widgets.tabMotion ~= nil and widgets.section == nil, "tabs: dialog uses tabs")
+end
+
 -- color schemes: pickers relabel per scheme, picks persist per scheme
 check(widgets.c1.visible and widgets.c1.label == "Body" and widgets.c2.visible == false, "Mono shows one picker")
 set("colorScheme", "Limbs")
@@ -161,6 +182,11 @@ check(widgets.c2.value.red == 1 and widgets.c2.value.blue == 3, "Limbs pick surv
 click("resetColors")
 check(widgets.c2.value.red == 255, "reset colors restores scheme defaults")
 set("colorScheme", "Segments")
+if NOTABS then
+  set("section", "Motion")
+  check(not widgets.c8.visible and widgets.param1.visible and not widgets.param6.visible,
+        "no tabs: back to Motion hides colors, param sliders keep their own visibility")
+end
 
 set("style", "Joints + arcs"); set("travel", true)
 
@@ -201,5 +227,5 @@ click("remove")
 check(M.Ghost.findLayer(spr, M.Ghost.ALL) == nil, "remove ghost")
 click("close")
 
-print(failures == 0 and "ALL PASSED" or (failures .. " FAILED"))
+print((NOTABS and "[no tabs] " or "[tabs] ") .. (failures == 0 and "ALL PASSED" or (failures .. " FAILED")))
 if failures > 0 then error(failures .. " test(s) failed") end

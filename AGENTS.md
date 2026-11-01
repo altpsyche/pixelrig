@@ -104,6 +104,8 @@ Each of these is decided and load-bearing. Sources are authoritative; read them 
   value (`rig.lua` `along()` exists for this).
 - Do not use `string.find` with a literal containing `-` or other magic characters without the
   plain flag (`find(s, 1, true)`).
+- Do not call `Dialog:tab` / `Dialog:endtabs` directly: Aseprite v1.3-rc6 (Lua API 25) lacks them
+  and raises on the field. Build sectioned dialogs through `sections.lua` (#40).
 - Do not test dialog code by opening `Dialog` in batch mode: it is nil there. Drive it through
   `tests/ui_mock.lua`.
 - Do not claim a UI behaviour works because the mock passes. Say it is mock-tested until the owner

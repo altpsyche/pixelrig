@@ -65,7 +65,8 @@ Skeleton proportions live in `rigs/<name>.json`, normalized to standing height.
 | --- | --- |
 | `main.lua` | Command registration |
 | `modules.lua` | Module loader, clip library (built-in + user) |
-| `ui.lua` | Dialog: preview canvas, transport, tabs, pose dragging |
+| `ui.lua` | Dialog: preview canvas, transport, sections, pose dragging |
+| `sections.lua` | Dialog sections: tabs where Aseprite has them, a section picker on older builds (v1.3-rc6) |
 | `ghost.lua` | Build frames, travel/foot lock, render, apply, scopes, persistence, fit, preview composite |
 | `clip.lua` | Clip sampling, param mods, key pose easing, key editing |
 | `rig.lua` | Side-view FK, ground solve, proportion presets |
@@ -96,6 +97,6 @@ tools/package.sh                   # build dist/*.aseprite-extension and dist/*.
 2. Commit, then tag `v<version>` and push the tag.
 3. The Release workflow checks the tag matches `package.json`, builds both packages and publishes the release (versions with a `-suffix` are marked pre-release).
 
-`tests/headless.lua` covers build, render, travel, easing, pose edits and sprite apply. `tests/ui_mock.lua` drives the dialog through a mock `Dialog` (batch mode has no UI).
+`tests/headless.lua` covers build, render, travel, easing, pose edits and sprite apply. `tests/ui_mock.lua` drives the dialog through a mock `Dialog` (batch mode has no UI), once with tabs and once without, as on Aseprite v1.3-rc6.
 
 Aseprite ignores symlinked extension directories, so `dev-install.sh` makes a real directory of per-file symlinks. Rerun it after adding top-level files.

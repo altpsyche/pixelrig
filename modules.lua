@@ -40,6 +40,7 @@ return function(dir)
     return lib
   end
 
+  M.Sections = mod("sections")
   M.UI = mod("ui")(M)
   return M
 end

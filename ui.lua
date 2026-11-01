@@ -46,6 +46,7 @@ return function(M)
     local view = { x = 0, y = 0, z = 1 }
     local playTimer, changeTimer, applyTimer
     local storeColors, refreshColors, onSchemeChange, changed
+    local sec -- Sections: tabs, or a section picker on Aseprite builds without Dialog:tab
 
     local function alive()
       return pcall(function() return sprite.width end)
@@ -106,9 +107,10 @@ return function(M)
       for i = 1, M.Colors.MAX_SLOTS do
         local slot = slots[i]
         if slot then
-          dlg:modify { id = "c" .. i, visible = true, label = slot.label, color = colorOf(current[slot.id]) }
+          dlg:modify { id = "c" .. i, label = slot.label, color = colorOf(current[slot.id]) }
+          sec:setVisible("c" .. i, true)
         else
-          dlg:modify { id = "c" .. i, visible = false }
+          sec:setVisible("c" .. i, false)
         end
       end
     end
@@ -340,9 +342,10 @@ return function(M)
         if p then
           local v = values[p.id]
           if v == nil then v = p.default end
-          dlg:modify { id = "param" .. i, visible = true, label = p.label, min = p.min, max = p.max, value = v }
+          dlg:modify { id = "param" .. i, label = p.label, min = p.min, max = p.max, value = v }
+          sec:setVisible("param" .. i, true)
         else
-          dlg:modify { id = "param" .. i, visible = false }
+          sec:setVisible("param" .. i, false)
         end
       end
     end
@@ -508,60 +511,67 @@ return function(M)
     dlg:slider { id = "frame", label = "Frame", min = 1, max = max(2, S.frames), value = 1,
                  onchange = function() stopPlay(); setFrame(dlg.data.frame) end }
 
-    dlg:tab { id = "tabMotion", text = "Motion" }
-    dlg:combobox { id = "clip", label = "Clip", option = work.name, options = lib.names, onchange = onClipChange }
-    dlg:combobox { id = "scope", label = "Range", option = S.scope, options = Ghost.scopes(sprite), onchange = onScopeChange }
-    dlg:slider { id = "frames", label = "Frames", min = 2, max = 48, value = S.frames, onchange = changed }
-    dlg:slider { id = "fps", label = "FPS", min = 1, max = 60, value = S.fps, onchange = changed }
-    dlg:check { id = "fillAll", label = "Frames", text = "Loop over range", selected = S.fillAll, onclick = changed }
-    dlg:check { id = "timing", text = "Set frame durations", selected = S.timing, onclick = changed }
-    dlg:check { id = "labels", text = "Key pose tags", selected = S.labels, onclick = changed }
-    dlg:separator { text = "Clip" }
+    sec = M.Sections.new(dlg, {
+      { id = "tabMotion", text = "Motion" }, { id = "tabBody", text = "Body" },
+      { id = "tabPlace", text = "Place" }, { id = "tabLook", text = "Look" },
+      { id = "tabPose", text = "Pose" },
+    })
+    local W = sec.widgets
+
+    sec:begin("tabMotion")
+    W:combobox { id = "clip", label = "Clip", option = work.name, options = lib.names, onchange = onClipChange }
+    W:combobox { id = "scope", label = "Range", option = S.scope, options = Ghost.scopes(sprite), onchange = onScopeChange }
+    W:slider { id = "frames", label = "Frames", min = 2, max = 48, value = S.frames, onchange = changed }
+    W:slider { id = "fps", label = "FPS", min = 1, max = 60, value = S.fps, onchange = changed }
+    W:check { id = "fillAll", label = "Frames", text = "Loop over range", selected = S.fillAll, onclick = changed }
+    W:check { id = "timing", text = "Set frame durations", selected = S.timing, onclick = changed }
+    W:check { id = "labels", text = "Key pose tags", selected = S.labels, onclick = changed }
+    W:separator { text = "Clip" }
     for i = 1, MAXP do
-      dlg:slider { id = "param" .. i, label = "Param", min = 0, max = 100, value = 0, visible = false, onchange = changed }
+      W:slider { id = "param" .. i, label = "Param", min = 0, max = 100, value = 0, visible = false, onchange = changed }
     end
-    dlg:separator { text = "Travel" }
-    dlg:check { id = "travel", label = "Root", text = "Travel (no foot slide)", selected = S.travel, onclick = changed }
-    dlg:slider { id = "travelSpeed", label = "Speed %", min = 0, max = 200, value = S.travelSpeed, onchange = changed }
-    dlg:check { id = "footprints", text = "Footprints", selected = S.footprints, onclick = changed }
-    dlg:check { id = "groundLine", text = "Ground line", selected = S.groundLine, onclick = changed }
+    W:separator { text = "Travel" }
+    W:check { id = "travel", label = "Root", text = "Travel (no foot slide)", selected = S.travel, onclick = changed }
+    W:slider { id = "travelSpeed", label = "Speed %", min = 0, max = 200, value = S.travelSpeed, onchange = changed }
+    W:check { id = "footprints", text = "Footprints", selected = S.footprints, onclick = changed }
+    W:check { id = "groundLine", text = "Ground line", selected = S.groundLine, onclick = changed }
 
-    dlg:tab { id = "tabBody", text = "Body" }
-    dlg:combobox { id = "preset", label = "Preset", option = S.preset or "Default", options = presetNames(), onchange = onPresetChange }
-    dlg:slider { id = "pHead", label = "Head %", min = 50, max = 250, value = S.proportions.head, onchange = onProportion }
-    dlg:slider { id = "pTorso", label = "Torso %", min = 50, max = 200, value = S.proportions.torso, onchange = onProportion }
-    dlg:slider { id = "pArms", label = "Arms %", min = 50, max = 200, value = S.proportions.arms, onchange = onProportion }
-    dlg:slider { id = "pLegs", label = "Legs %", min = 50, max = 200, value = S.proportions.legs, onchange = onProportion }
-    dlg:slider { id = "pBulk", label = "Bulk %", min = 50, max = 250, value = S.proportions.bulk, onchange = onProportion }
-    dlg:combobox { id = "facing", label = "Facing", option = S.facing, options = { "Right", "Left" }, onchange = changed }
+    sec:begin("tabBody")
+    W:combobox { id = "preset", label = "Preset", option = S.preset or "Default", options = presetNames(), onchange = onPresetChange }
+    W:slider { id = "pHead", label = "Head %", min = 50, max = 250, value = S.proportions.head, onchange = onProportion }
+    W:slider { id = "pTorso", label = "Torso %", min = 50, max = 200, value = S.proportions.torso, onchange = onProportion }
+    W:slider { id = "pArms", label = "Arms %", min = 50, max = 200, value = S.proportions.arms, onchange = onProportion }
+    W:slider { id = "pLegs", label = "Legs %", min = 50, max = 200, value = S.proportions.legs, onchange = onProportion }
+    W:slider { id = "pBulk", label = "Bulk %", min = 50, max = 250, value = S.proportions.bulk, onchange = onProportion }
+    W:combobox { id = "facing", label = "Facing", option = S.facing, options = { "Right", "Left" }, onchange = changed }
 
-    dlg:tab { id = "tabPlace", text = "Place" }
-    dlg:button { id = "fit", text = "Fit to art (selection / layer)", onclick = onFit }
-    dlg:slider { id = "height", label = "Height px", min = 8, max = max(16, sprite.height * 2), value = S.height, onchange = changed }
-    dlg:slider { id = "groundY", label = "Ground Y", min = 0, max = sprite.height - 1, value = S.groundY, onchange = changed }
-    dlg:slider { id = "cx", label = "Center X", min = 0, max = sprite.width, value = S.cx, onchange = changed }
+    sec:begin("tabPlace")
+    W:button { id = "fit", text = "Fit to art (selection / layer)", onclick = onFit }
+    W:slider { id = "height", label = "Height px", min = 8, max = max(16, sprite.height * 2), value = S.height, onchange = changed }
+    W:slider { id = "groundY", label = "Ground Y", min = 0, max = sprite.height - 1, value = S.groundY, onchange = changed }
+    W:slider { id = "cx", label = "Center X", min = 0, max = sprite.width, value = S.cx, onchange = changed }
 
-    dlg:tab { id = "tabLook", text = "Look" }
-    dlg:combobox { id = "style", label = "Style", option = S.style, options = Render.STYLES, onchange = changed }
-    dlg:slider { id = "thickness", label = "Line px", min = 1, max = 8, value = S.thickness, onchange = changed }
-    dlg:check { id = "pixelPerfect", text = "Pixel-perfect 1px lines", selected = S.pixelPerfect, onclick = changed }
-    dlg:combobox { id = "colorScheme", label = "Colors", option = S.colorScheme, options = M.Colors.SCHEMES, onchange = onSchemeChange }
+    sec:begin("tabLook")
+    W:combobox { id = "style", label = "Style", option = S.style, options = Render.STYLES, onchange = changed }
+    W:slider { id = "thickness", label = "Line px", min = 1, max = 8, value = S.thickness, onchange = changed }
+    W:check { id = "pixelPerfect", text = "Pixel-perfect 1px lines", selected = S.pixelPerfect, onclick = changed }
+    W:combobox { id = "colorScheme", label = "Colors", option = S.colorScheme, options = M.Colors.SCHEMES, onchange = onSchemeChange }
     for i = 1, M.Colors.MAX_SLOTS do
-      dlg:color { id = "c" .. i, label = "Color", color = Color { r = 0, g = 0, b = 0 }, visible = false, onchange = changed }
+      W:color { id = "c" .. i, label = "Color", color = Color { r = 0, g = 0, b = 0 }, visible = false, onchange = changed }
     end
-    dlg:button { id = "resetColors", text = "Reset colors", onclick = function()
+    W:button { id = "resetColors", text = "Reset colors", onclick = function()
       S.schemeColors[S.colorScheme] = nil
       refreshColors()
       changed()
     end }
-    dlg:slider { id = "opacity", label = "Opacity %", min = 5, max = 100, value = S.opacity, onchange = changed }
-    dlg:check { id = "showArt", text = "Show art in preview", selected = S.showArt ~= false, onclick = changed }
+    W:slider { id = "opacity", label = "Opacity %", min = 5, max = 100, value = S.opacity, onchange = changed }
+    W:check { id = "showArt", text = "Show art in preview", selected = S.showArt ~= false, onclick = changed }
 
-    dlg:tab { id = "tabPose", text = "Pose" }
-    dlg:label { id = "help", label = "Edit", text = "Pause, drag joints in preview." }
-    dlg:label { id = "help2", text = "Far limbs share near curves (half cycle)." }
-    dlg:label { id = "segment", label = "Segment", text = "" }
-    dlg:combobox { id = "ease", label = "Spacing", option = "Linear", options = Clip.EASES, onchange = function()
+    sec:begin("tabPose")
+    W:label { id = "help", label = "Edit", text = "Pause, drag joints in preview." }
+    W:label { id = "help2", text = "Far limbs share near curves (half cycle)." }
+    W:label { id = "segment", label = "Segment", text = "" }
+    W:combobox { id = "ease", label = "Spacing", option = "Linear", options = Clip.EASES, onchange = function()
       local _, i = markLabel()
       if not i then return end
       work.marks[i].ease = dlg.data.ease
@@ -569,11 +579,11 @@ return function(M)
       rebuild()
       if dlg.data.autoApply then applyTimer:stop(); applyTimer:start() end
     end }
-    dlg:label { id = "dirtyInfo", text = "" }
-    dlg:entry { id = "clipName", label = "Save as", text = work.name .. " custom" }
-    dlg:button { id = "saveClip", text = "Save clip", onclick = onSaveClip }
-    dlg:button { id = "revert", text = "Revert clip", onclick = onRevert }
-    dlg:endtabs { id = "tabs", selected = "tabMotion" }
+    W:label { id = "dirtyInfo", text = "" }
+    W:entry { id = "clipName", label = "Save as", text = work.name .. " custom" }
+    W:button { id = "saveClip", text = "Save clip", onclick = onSaveClip }
+    W:button { id = "revert", text = "Revert clip", onclick = onRevert }
+    sec:finish()
 
     dlg:separator()
     dlg:check { id = "autoApply", text = "Auto-apply to sprite", selected = false }
