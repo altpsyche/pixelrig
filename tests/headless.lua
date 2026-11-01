@@ -659,6 +659,34 @@ do
   spr:close()
 end
 
+-- A fit lands inside the Place sliders' ranges (#44): a selection shorter than the Height
+-- minimum fits to the minimum, and art reaching past the canvas fits to the nearest edge.
+do
+  local spr = Sprite(64, 64, ColorMode.RGB)
+  local lim = Ghost.placeLimits(spr)
+  check(lim and lim.height.min == 8 and lim.height.max == 128 and lim.groundY.min == 0 and lim.groundY.max == 63
+        and lim.cx.min == 0 and lim.cx.max == 64, "Place slider limits follow the sprite size")
+
+  spr.selection = Selection(Rectangle(4, 20, 10, 5))
+  local fit = Ghost.fitToArt(spr, 1)
+  check(fit and fit.height == 8 and fit.groundY == 24 and fit.cx == 9,
+        "a selection 5px tall fits to the 8px Height minimum, on its own ground (" ..
+        (fit and (fit.height .. "px, ground " .. fit.groundY .. ", cx " .. fit.cx) or "nil") .. ")")
+  spr.selection = Selection()
+
+  -- A cel 150px tall hanging off the top-left corner: taller than the Height maximum, ground
+  -- below the canvas, center left of it.
+  local tall = Image(10, 150, ColorMode.RGB)
+  for y = 0, 149 do for x = 0, 9 do tall:drawPixel(x, y, app.pixelColor.rgba(200, 80, 40, 255)) end end
+  spr.cels[1].image = tall
+  spr.cels[1].position = Point(-20, -40)
+  fit = Ghost.fitToArt(spr, 1)
+  check(fit and fit.height == 128 and fit.groundY == 63 and fit.cx == 0,
+        "art past the canvas fits inside the slider ranges (" ..
+        (fit and (fit.height .. "px, ground " .. fit.groundY .. ", cx " .. fit.cx) or "nil") .. ")")
+  spr:close()
+end
+
 -- Apply and Remove leave the artist where they were (#3): a 3-frame sprite, frame 1 and an art
 -- layer active, a 5-frame ghost that adds frames (opted in, ADR-0005); then the same with
 -- another sprite active.

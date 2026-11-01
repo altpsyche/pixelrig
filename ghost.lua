@@ -496,8 +496,30 @@ return function(Clip, Rig, Render, Colors, Util)
     return out
   end
 
+  -- Ranges of the dialog's Place sliders for a sprite: Height px, Ground Y and Center X. The
+  -- dialog builds its sliders from these, so a value clamped to them always fits its slider (#44).
+  function Ghost.placeLimits(sprite)
+    return {
+      height = { min = 8, max = math.max(16, sprite.height * 2) },
+      groundY = { min = 0, max = sprite.height - 1 },
+      cx = { min = 0, max = sprite.width },
+    }
+  end
+
+  -- Clamps s.height, s.groundY and s.cx into Ghost.placeLimits(sprite), in place; returns s.
+  -- A value that is not a number is left for the caller's defaults.
+  function Ghost.clampPlace(s, sprite)
+    for key, r in pairs(Ghost.placeLimits(sprite)) do
+      local v = s[key]
+      if type(v) == "number" then s[key] = math.min(r.max, math.max(r.min, v)) end
+    end
+    return s
+  end
+
   -- Bounding box of art: the selection, else the union of all visible art layers in the frame
-  -- (ghost and reference layers excluded). The active layer does not narrow it (#42).
+  -- (ghost and reference layers excluded). The active layer does not narrow it (#42). The result
+  -- is clamped to the Place sliders (#44): art shorter than the Height minimum fits to the
+  -- minimum, standing on the art's own ground; art past the canvas fits to the nearest edge.
   function Ghost.fitToArt(sprite, frameNumber)
     local bounds
     if not sprite.selection.isEmpty then
@@ -515,11 +537,11 @@ return function(Clip, Rig, Render, Colors, Util)
       end
     end
     if not bounds or bounds.isEmpty then return nil end
-    return {
+    return Ghost.clampPlace({
       height = bounds.height,
       groundY = bounds.y + bounds.height - 1,
       cx = bounds.x + bounds.width // 2,
-    }
+    }, sprite)
   end
 
   -- Preview background --------------------------------------------------------
