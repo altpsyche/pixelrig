@@ -10,7 +10,7 @@ return function(dir)
   M.Colors = mod("colors")
   M.Render = mod("render")(M.Stamps)
   M.Ghost = mod("ghost")(M.Clip, M.Rig, M.Render, M.Colors, M.Util)
-  M.Clip.readJson, M.Rig.readJson = M.Util.readJson, M.Util.readJson
+  M.Clip.decode, M.Rig.readJson = M.Util.decode, M.Util.readJson
 
   function M.userClipsDir()
     return app.fs.joinPath(app.fs.userConfigPath, "pixelrig", "clips")

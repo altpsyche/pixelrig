@@ -47,6 +47,8 @@ do
     f:close()
   end
   writeText(app.fs.joinPath(dir, "notjson.json"), "{ not json")
+  -- A .json entry that cannot be read as a file: a folder.
+  app.fs.makeAllDirectories(app.fs.joinPath(dir, "unreadable.json"))
   -- Rigs from a test folder: the real humanoid, and a rig file that exists but cannot be read.
   local rigDir = app.fs.joinPath(out, "badrigs")
   app.fs.makeAllDirectories(rigDir)
@@ -78,7 +80,8 @@ do
     skipped("boolrepeat", "channel 'leg.knee' has a bad repeat")
     skipped("brokenrig", "rig 'brokenrig' is unreadable")
     skipped("notjson", "not valid JSON")
-    check(#(badLib.skipped or {}) == 10, "library: exactly the bad clips skipped (" .. #(badLib.skipped or {}) .. ")")
+    skipped("unreadable", "cannot be read")
+    check(#(badLib.skipped or {}) == 11, "library: exactly the bad clips skipped (" .. #(badLib.skipped or {}) .. ")")
     local oneLine = true
     for _, s in ipairs(badLib.skipped or {}) do
       if s.reason:find("\n", 1, true) or #s.reason > 60 then oneLine = false end

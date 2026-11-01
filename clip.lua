@@ -5,7 +5,7 @@
 
 local Clip = {}
 
-Clip.readJson = nil -- set by loader
+Clip.decode = nil -- JSON text -> plain tables, set by loader
 Clip.EASES = { "Linear", "Ease in", "Ease out", "Ease in-out", "Hold" }
 
 local function sortKeys(keys)
@@ -67,7 +67,11 @@ end
 
 -- Both raise a one-line reason, with no position prefix, when the clip cannot be used.
 function Clip.load(path, origin)
-  local ok, data = pcall(Clip.readJson, path)
+  local f = io.open(path, "r")
+  local text = f and f:read("a")
+  if f then f:close() end
+  if type(text) ~= "string" then error("cannot be read", 0) end
+  local ok, data = pcall(Clip.decode, text)
   if not ok then error("not valid JSON", 0) end
   return Clip.fromData(data, origin)
 end
