@@ -90,10 +90,17 @@ has confirmed the spec's testing seams.
    Reading the diff yourself is not the self-check. Fix what it finds; it is not the review
    (§ Roles).
 8. Evals, so a skill change is proven like code: when the diff touches `.agents/skills/<name>/`,
-   run every case in `evals/<name>/`; when it touches `AGENTS.md`, every case in `evals/`. Run
-   each, and have another session grade it, per [`evals/README.md`](../evals/README.md). A skill
-   with no folder in `evals/` has no case to run. A grade holds for the commit it ran on: a later
-   commit to those paths, in a fix round too, needs a fresh run.
+   run every case in `evals/<name>/`; when it touches `AGENTS.md`, every case in `evals/`, unless
+   it changes only the list of checks. That list is the text in `AGENTS.md` § Verifying your work
+   from `It checks` up to, not including, the sentence that starts `CI has no Aseprite`, which
+   names what `scripts/verify.sh` runs and changes with every new check. The exception holds when
+   `git diff --word-diff <base> -- AGENTS.md`, with `<base>` the PR's base (`origin/main`, or a
+   sub-PR's per § 3), marks every added or removed word inside that list; it does not mark text
+   only rewrapped. Any other change to `AGENTS.md`, that sentence and the rest of the section
+   included, still runs every case. Run each, and have another session grade it, per
+   [`evals/README.md`](../evals/README.md). A skill with no folder in `evals/` has no case to run.
+   A grade holds for the commit it ran on: a later commit this step covers, in a fix round too,
+   needs a fresh run.
 9. **Open a PR** whose body, written by `/pr` with its Evidence per **Evidence**, says
    `Closes #<n>`, labelled `status:in-review`. Without that label no Reviewer finds it.
 
