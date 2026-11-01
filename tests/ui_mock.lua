@@ -125,6 +125,13 @@ local spr = Sprite(64, 64, ColorMode.RGB)
 local img = Image(64, 64, ColorMode.RGB)
 for y = 20, 59 do for x = 28, 35 do img:drawPixel(x, y, app.pixelColor.rgba(200, 80, 40, 255)) end end
 spr.cels[1].image = img
+-- A small "Boots" layer inside the body, left active: Fit must still measure the whole body (#42).
+local boots = spr:newLayer()
+boots.name = "Boots"
+local bootsImg = Image(64, 64, ColorMode.RGB)
+for y = 55, 59 do for x = 29, 34 do bootsImg:drawPixel(x, y, app.pixelColor.rgba(60, 40, 20, 255)) end end
+spr:newCel(boots, 1, bootsImg, Point(0, 0))
+app.layer = boots
 local tag = spr:newTag(1, 1)
 tag.name = "idle"
 
@@ -241,7 +248,8 @@ set("style", "Joints + arcs"); set("travel", true)
 click("next"); click("prev"); click("play"); click("play")
 check(true, "transport buttons ok")
 
--- fit
+-- fit, with the Boots layer still active
+check(app.layer == boots and widgets.height.value ~= 40, "fit button starts from a changed height")
 click("fit")
 check(widgets.height.value == 40, "fit button")
 

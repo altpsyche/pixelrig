@@ -126,7 +126,7 @@ do
   for y = 30, 59 do for x = 27, 36 do img:drawPixel(x, y, app.pixelColor.rgba(200, 80, 40, 255)) end end
   spr.cels[1].image = img
 
-  local fit = Ghost.fitToArt(spr, 1, art)
+  local fit = Ghost.fitToArt(spr, 1)
   check(fit and fit.height == 30 and fit.groundY == 59 and fit.cx == 32, "fit to art bounds")
 
   local s = settings { height = fit.height, groundY = fit.groundY, cx = fit.cx, frames = 12 }
@@ -160,6 +160,33 @@ do
 
   Ghost.remove(spr, "attack")
   check(Ghost.findLayer(spr, "attack") == nil and Ghost.findLayer(spr, Ghost.ALL) ~= nil, "remove only that scope")
+  spr:close()
+end
+
+-- Fit measures all visible art, not the active layer (#42): a body layer and a small boots
+-- layer, boots active, fit to the whole body; a non-empty selection still wins.
+do
+  local spr = Sprite(64, 64, ColorMode.RGB)
+  local body = spr.layers[1]
+  body.name = "Body"
+  local bodyImg = Image(64, 64, ColorMode.RGB)
+  for y = 10, 49 do for x = 24, 39 do bodyImg:drawPixel(x, y, app.pixelColor.rgba(200, 80, 40, 255)) end end
+  spr.cels[1].image = bodyImg
+  local boots = spr:newLayer()
+  boots.name = "Boots"
+  local bootsImg = Image(64, 64, ColorMode.RGB)
+  for y = 50, 57 do for x = 26, 33 do bootsImg:drawPixel(x, y, app.pixelColor.rgba(60, 40, 20, 255)) end end
+  spr:newCel(boots, 1, bootsImg, Point(0, 0))
+  app.layer = boots
+
+  local fit = Ghost.fitToArt(spr, 1)
+  check(app.layer == boots and fit and fit.height == 48 and fit.groundY == 57 and fit.cx == 32,
+        "fit ignores the active layer: boots active, fits the whole body (" ..
+        (fit and (fit.height .. "px, ground " .. fit.groundY .. ", cx " .. fit.cx) or "nil") .. ")")
+
+  spr.selection = Selection(Rectangle(4, 20, 10, 12))
+  fit = Ghost.fitToArt(spr, 1)
+  check(fit and fit.height == 12 and fit.groundY == 31 and fit.cx == 9, "a non-empty selection still wins the fit")
   spr:close()
 end
 

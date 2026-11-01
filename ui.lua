@@ -58,7 +58,7 @@ return function(M)
       s.height = max(8, floor(sprite.height * 0.8))
       s.groundY = sprite.height - 1
       s.cx = sprite.width // 2
-      local fit = Ghost.fitToArt(sprite, app.frame and app.frame.frameNumber or 1, app.layer)
+      local fit = Ghost.fitToArt(sprite, app.frame and app.frame.frameNumber or 1)
       if fit then s.height, s.groundY, s.cx = fit.height, fit.groundY, fit.cx end
       if scope ~= Ghost.ALL then
         local a, b = Ghost.scopeRange(sprite, scope)
@@ -433,7 +433,7 @@ return function(M)
 
     local function onFit()
       if not alive() then return end
-      local fit = Ghost.fitToArt(sprite, app.frame and app.frame.frameNumber or 1, app.layer)
+      local fit = Ghost.fitToArt(sprite, app.frame and app.frame.frameNumber or 1)
       if not fit then
         app.alert("No art found: select an area or draw on a layer first.")
         return
