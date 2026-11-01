@@ -27,7 +27,14 @@ View → Ghost Reference... opens a dialog with an animated preview over your ar
 
 **Place tab.** Fit to art: uses the selection, else the active layer, else all visible art. Height, ground line, center X. A new ghost auto-fits on first open.
 
-**Look tab.** Stick, Capsule, Joints + arcs. Line width, pixel-perfect 1px lines, color schemes: Mono, Near / Far, Limbs (debug: one color per limb and side), Segments (debug: one color per bone). Opacity.
+**Look tab.** Stick, Capsule, Joints + arcs. Line width, pixel-perfect 1px lines, opacity. Color schemes, each with its own pickers (picks are kept per scheme; Reset colors restores defaults):
+
+| Scheme | Pickers |
+| --- | --- |
+| Mono | Body (far side auto-darkened) |
+| Near / Far | Body, Near side, Far side |
+| Limbs | Body, Near arm, Far arm, Near leg, Far leg |
+| Segments | Torso, Neck, Head, Upper arm, Forearm, Thigh, Shin, Foot (far side auto-darkened) |
 
 **Pose tab.** Pause and drag joints in the preview to edit the current frame (knee, ankle, toe, elbow, hand, neck, head). Far limbs share the near limb's curve half a cycle later, so editing one edits both. Set spacing per key pose: Linear, Ease in, Ease out, Ease in-out, Hold. Save the result as your own clip, or Apply and the edits are kept with the ghost.
 

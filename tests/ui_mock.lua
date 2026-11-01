@@ -15,6 +15,7 @@ local function add(kind, t)
   assert(t.id, kind .. " without id")
   assert(not widgets[t.id], "duplicate id " .. t.id)
   local w = { kind = kind, t = t }
+  w.visible = t.visible ~= false
   if kind == "slider" then
     w.value = t.value; w.min = t.min; w.max = t.max
     assert(t.value >= t.min and t.value <= t.max, t.id .. " value out of range")
@@ -56,6 +57,7 @@ function mock:modify(t)
   end
   if t.text ~= nil then w.value = t.text end
   if t.visible ~= nil then w.visible = t.visible end
+  if t.label ~= nil then w.label = t.label end
   if t.color ~= nil then w.value = t.color end
   if w.kind == "slider" and (w.value < w.min or w.value > w.max) then
     error(t.id .. " value " .. w.value .. " outside " .. w.min .. ".." .. w.max)
@@ -147,8 +149,20 @@ check(widgets.pHead.value == 200, "preset applies proportions")
 set("pLegs", 90)
 check(widgets.preset.value == "Custom", "manual proportion -> Custom")
 
--- style / scheme
-set("style", "Joints + arcs"); set("colorScheme", "Segments"); set("travel", true)
+-- color schemes: pickers relabel per scheme, picks persist per scheme
+check(widgets.c1.visible and widgets.c1.label == "Body" and widgets.c2.visible == false, "Mono shows one picker")
+set("colorScheme", "Limbs")
+check(widgets.c5.visible and not widgets.c6.visible, "Limbs shows five pickers")
+set("c2", Color { r = 1, g = 2, b = 3 })      -- near arm
+set("colorScheme", "Segments")
+check(widgets.c8.visible, "Segments shows eight pickers")
+set("colorScheme", "Limbs")
+check(widgets.c2.value.red == 1 and widgets.c2.value.blue == 3, "Limbs pick survives scheme switch")
+click("resetColors")
+check(widgets.c2.value.red == 255, "reset colors restores scheme defaults")
+set("colorScheme", "Segments")
+
+set("style", "Joints + arcs"); set("travel", true)
 
 -- frame transport
 click("next"); click("prev"); click("play"); click("play")

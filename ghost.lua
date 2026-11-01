@@ -13,7 +13,8 @@ return function(Clip, Rig, Render, Colors, Util)
     style = "Stick", facing = "Right", thickness = 1, pixelPerfect = true,
     height = 48, groundY = 63, cx = 32,
     frames = 12, fps = 12, timing = false, fillAll = true, labels = true,
-    colorScheme = "Mono", color = { 0, 170, 255 }, color2 = { 235, 60, 60 }, opacity = 40,
+    colorScheme = "Mono", opacity = 40,
+    schemeColors = {}, -- schemeColors[scheme][slotId] = {r, g, b}; missing slots use scheme defaults
     travel = false, travelSpeed = 100, footprints = true, groundLine = false,
     preset = "Default",
     proportions = { head = 100, torso = 100, arms = 100, legs = 100, bulk = 100 },
@@ -72,6 +73,14 @@ return function(Clip, Rig, Render, Colors, Util)
     if not text then return nil end
     local ok, data = pcall(Util.decode, text)
     if not ok then return nil end
+    -- v0.1 stored two flat colors; map them onto scheme slots.
+    if data.color and not data.schemeColors then
+      data.schemeColors = {
+        ["Mono"] = { body = data.color },
+        ["Near / Far"] = { body = data.color, near = data.color, far = data.color2 },
+      }
+    end
+    data.color, data.color2 = nil, nil
     return Util.merge(Ghost.DEFAULTS, data)
   end
 
@@ -207,7 +216,8 @@ return function(Clip, Rig, Render, Colors, Util)
 
   -- Render cycle frame i (1-based) of build into img.
   function Ghost.renderFrame(img, build, i, s, toPixel)
-    local resolve = Colors.resolver(s.colorScheme, s.color, s.color2)
+    local picks = (s.schemeColors or {})[s.colorScheme]
+    local resolve = Colors.resolver(s.colorScheme, Colors.resolve(s.colorScheme, picks))
     local W, Hh = img.width, img.height
     local put = function(x, y, c)
       if x >= 0 and y >= 0 and x < W and y < Hh then img:drawPixel(x, y, c) end

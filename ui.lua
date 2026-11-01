@@ -45,6 +45,7 @@ return function(M)
     local cur, playing, drag = 1, false, nil
     local view = { x = 0, y = 0, z = 1 }
     local playTimer, changeTimer, applyTimer
+    local storeColors, refreshColors, onSchemeChange, changed
 
     local function alive()
       return pcall(function() return sprite.width end)
@@ -85,13 +86,48 @@ return function(M)
     if Ghost.isGhost(app.layer) then initialScope = Ghost.layerScope(app.layer) end
     loadScope(initialScope)
 
+    -- Scheme colors ----------------------------------------------------------
+    -- Color pickers c1..cN are relabelled per scheme; picks stored per scheme.
+    local function slotsOf(scheme) return M.Colors.SLOTS[scheme] or M.Colors.SLOTS.Mono end
+
+    function storeColors()
+      local d = dlg.data
+      S.schemeColors = S.schemeColors or {}
+      local picks = {}
+      for i, slot in ipairs(slotsOf(S.colorScheme)) do
+        picks[slot.id] = rgbOf(d["c" .. i])
+      end
+      S.schemeColors[S.colorScheme] = picks
+    end
+
+    function refreshColors()
+      local current = M.Colors.resolve(S.colorScheme, (S.schemeColors or {})[S.colorScheme])
+      local slots = slotsOf(S.colorScheme)
+      for i = 1, M.Colors.MAX_SLOTS do
+        local slot = slots[i]
+        if slot then
+          dlg:modify { id = "c" .. i, visible = true, label = slot.label, color = colorOf(current[slot.id]) }
+        else
+          dlg:modify { id = "c" .. i, visible = false }
+        end
+      end
+    end
+
+    function onSchemeChange()
+      storeColors()                      -- keep picks of the scheme being left
+      S.colorScheme = dlg.data.colorScheme
+      refreshColors()
+      changed()
+    end
+
     -- Build + preview --------------------------------------------------------
     local function pull()
       local d = dlg.data
       S.style, S.facing, S.thickness, S.pixelPerfect = d.style, d.facing, d.thickness, d.pixelPerfect
       S.height, S.groundY, S.cx = d.height, d.groundY, d.cx
       S.frames, S.fps, S.timing, S.fillAll, S.labels = d.frames, d.fps, d.timing, d.fillAll, d.labels
-      S.colorScheme, S.color, S.color2, S.opacity = d.colorScheme, rgbOf(d.color), rgbOf(d.color2), d.opacity
+      S.opacity = d.opacity
+      storeColors()
       S.travel, S.travelSpeed, S.footprints, S.groundLine = d.travel, d.travelSpeed, d.footprints, d.groundLine
       S.preset = d.preset
       S.proportions = { head = d.pHead, torso = d.pTorso, arms = d.pArms, legs = d.pLegs, bulk = d.pBulk }
@@ -162,7 +198,7 @@ return function(M)
       bgCache = {}
     end
 
-    local function changed()
+    function changed()
       changeTimer:stop()
       changeTimer:start()
     end
@@ -327,8 +363,7 @@ return function(M)
         else dlg:modify { id = id, value = v } end
       end
       dlg:modify { id = "preset", option = S.preset or "Custom" }
-      dlg:modify { id = "color", color = colorOf(S.color) }
-      dlg:modify { id = "color2", color = colorOf(S.color2) }
+      refreshColors()
       dlg:modify { id = "clip", options = lib.names, option = work.name }
       dlg:modify { id = "clipName", text = work.name .. " custom" }
       refreshParams()
@@ -510,9 +545,15 @@ return function(M)
     dlg:combobox { id = "style", label = "Style", option = S.style, options = Render.STYLES, onchange = changed }
     dlg:slider { id = "thickness", label = "Line px", min = 1, max = 8, value = S.thickness, onchange = changed }
     dlg:check { id = "pixelPerfect", text = "Pixel-perfect 1px lines", selected = S.pixelPerfect, onclick = changed }
-    dlg:combobox { id = "colorScheme", label = "Colors", option = S.colorScheme, options = M.Colors.SCHEMES, onchange = changed }
-    dlg:color { id = "color", label = "Primary", color = colorOf(S.color), onchange = changed }
-    dlg:color { id = "color2", label = "Far side", color = colorOf(S.color2), onchange = changed }
+    dlg:combobox { id = "colorScheme", label = "Colors", option = S.colorScheme, options = M.Colors.SCHEMES, onchange = onSchemeChange }
+    for i = 1, M.Colors.MAX_SLOTS do
+      dlg:color { id = "c" .. i, label = "Color", color = Color { r = 0, g = 0, b = 0 }, visible = false, onchange = changed }
+    end
+    dlg:button { id = "resetColors", text = "Reset colors", onclick = function()
+      S.schemeColors[S.colorScheme] = nil
+      refreshColors()
+      changed()
+    end }
     dlg:slider { id = "opacity", label = "Opacity %", min = 5, max = 100, value = S.opacity, onchange = changed }
     dlg:check { id = "showArt", text = "Show art in preview", selected = S.showArt ~= false, onclick = changed }
 
@@ -543,6 +584,7 @@ return function(M)
     dlg:button { id = "close", text = "Close", onclick = function() dlg:close() end }
 
     refreshParams()
+    refreshColors()
     pull()
     rebuild()
     dlg:show { wait = false }
