@@ -46,6 +46,8 @@ function Util.writeJson(path, data)
     -- so one version always survives.
     if not moved and app.fs.isFile(path) then
       local bak = path .. ".bak"
+      -- A backup already there is stale (left by a save cut short): the file at path is newer.
+      if app.fs.isFile(bak) then os.remove(bak) end
       if os.rename(path, bak) then
         moved, moveErr = os.rename(tmp, path)
         if moved then os.remove(bak) else os.rename(bak, path) end

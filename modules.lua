@@ -43,6 +43,13 @@ return function(dir)
       local files = app.fs.listFiles(folder)
       table.sort(files)
       for _, file in ipairs(files) do
+        -- A backup Util.writeJson left with no clip file beside it: a save cut short. Never
+        -- restored here, as the newer data may sit in the .tmp; the artist decides.
+        local backupOf = origin == "user" and file:match("^(.+%.json)%.bak$")
+        if backupOf and not app.fs.isFile(app.fs.joinPath(folder, backupOf)) then
+          table.insert(lib.skipped, { file = file, origin = origin,
+                                      reason = "a save did not finish: rename it to .json" })
+        end
         if file:match("%.json$") then
           local function skip(reason)
             table.insert(lib.skipped, { file = file, origin = origin, reason = reason })

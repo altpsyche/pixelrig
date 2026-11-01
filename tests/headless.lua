@@ -226,6 +226,37 @@ do
   check(not okStuck and stuckWhy and survived and survived.fps == 40
         and not app.fs.isFile(path .. ".bak") and not app.fs.isFile(path .. ".tmp"),
         "write that cannot move the new file in keeps the old one (" .. tostring(stuckWhy) .. ")")
+
+  -- A stale backup beside the clip, as a save cut short leaves: a rename that will not overwrite
+  -- any existing file (as on Windows) still replaces the clip, and the stale backup goes.
+  local function putText(file, text)
+    local fh = io.open(app.fs.joinPath(dir, file), "w"); fh:write(text); fh:close()
+  end
+  putText(app.fs.fileName(path) .. ".bak", "stale")
+  os.rename = function(from, to)
+    if app.fs.isFile(to) then return nil, from .. ": File exists" end
+    return realRename(from, to)
+  end
+  d.fps = 60
+  local okStale, staleWhy = Util.writeJson(path, d)
+  os.rename = realRename
+  local fresh = M.loadLibrary().clips.Dup
+  check(okStale and fresh and fresh.fps == 60 and not app.fs.isFile(path .. ".bak"),
+        "write replaces a clip despite a stale backup (" .. tostring(staleWhy) .. ")")
+
+  -- A backup with no clip file beside it (a save cut short between its two moves) is listed.
+  local lone = Util.deepCopy(run)
+  lone.name = "Lone"
+  Util.writeJson(app.fs.joinPath(dir, "Lone.json.bak"), lone)
+  local loneListed = false
+  for _, sk in ipairs(M.loadLibrary().skipped) do
+    if sk.file == "Lone.json.bak" and sk.reason:find("rename", 1, true) and #sk.reason <= 60 then
+      loneListed = true
+    end
+  end
+  check(loneListed, "library: a backup left without its clip file is listed as skipped")
+  os.remove(app.fs.joinPath(dir, "Lone.json.bak"))
+
   M.userClipsDir = userDir
 end
 
