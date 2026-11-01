@@ -93,9 +93,12 @@ tools/package.sh                   # build dist/*.aseprite-extension and dist/*.
 
 ### Releasing
 
-1. Bump `version` in `package.json` and update `RELEASE_NOTES.md`.
-2. Commit, then tag `v<version>` and push the tag.
-3. The Release workflow checks the tag matches `package.json`, builds both packages and publishes the release (versions with a `-suffix` are marked pre-release).
+1. Bump `version` in `package.json` and write `docs/releases/v<version>.md`. Its first line is `# PixelRig v<version>`; the rest is the release's notes, and it names no other `vX.Y.Z` (start from the last release's file and replace every version in it).
+2. Merge that to `main` through a PR, as any change.
+3. After `git fetch origin`, tag the merged commit on `origin/main` as `v<version>`, run `tools/release-check.sh v<version>`, which is the workflow's gate and prints the notes it will publish, then push the tag.
+4. The Release workflow runs the gate, `tools/release-check.sh`, which fails unless the tag matches `package.json`, the tagged commit is on `main`, and the notes file exists and names this version and no other. It then builds both packages and publishes the release with those notes (versions with a `-suffix` are marked pre-release).
+
+Every notes file in `docs/releases/` is checked against its own tag by `scripts/verify.sh`, so a wrong heading or a stale version fails in the PR, before any tag.
 
 `tests/headless.lua` covers build, render, travel, easing, pose edits and sprite apply. `tests/ui_mock.lua` drives the dialog through a mock `Dialog` (batch mode has no UI), once with tabs and once without, as on Aseprite v1.3-rc6.
 

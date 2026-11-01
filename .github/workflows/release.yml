@@ -12,14 +12,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # the gate checks the tag is on origin/main
 
-      - name: Check tag matches package.json version
-        run: |
-          version="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' package.json | head -1)"
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match package.json version $version"
-            exit 1
-          fi
+      # Fails unless the tag is v<package.json version>, its commit is on origin/main, and
+      # docs/releases/<tag>.md names this version and no other. Prints the notes to publish.
+      - name: Check the tag and its notes
+        run: tools/release-check.sh "$GITHUB_REF_NAME" origin/main > "$RUNNER_TEMP/notes.md"
 
       - name: Build packages
         run: tools/package.sh
@@ -32,5 +31,5 @@ jobs:
           case "$GITHUB_REF_NAME" in *-*) prerelease="--prerelease" ;; esac
           gh release create "$GITHUB_REF_NAME" dist/* \
             --title "PixelRig $GITHUB_REF_NAME" \
-            --notes-file RELEASE_NOTES.md \
+            --notes-file "$RUNNER_TEMP/notes.md" \
             $prerelease
