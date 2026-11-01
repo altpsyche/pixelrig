@@ -391,6 +391,17 @@ do
   check(#spr.frames == 8 and Ghost.loadSettings(Ghost.findLayer(spr, Ghost.ALL)).addFrames == false,
         "add frames on: one undo removes the added frames with that apply (" .. #spr.frames .. " frames)")
 
+  -- Only a saved true turns it on: a non-boolean value (a hand-edited or corrupt property) is off.
+  for _, v in ipairs({ "false", "true", 1, 0 }) do
+    local layer2 = Ghost.findLayer(spr, Ghost.ALL)
+    layer2.properties("pixelrig").settings = json.encode({ addFrames = v, frames = 12 })
+    local loaded = Ghost.loadSettings(layer2)
+    local s3 = settings { frames = 12, height = 40, groundY = 60, cx = 32, addFrames = v }
+    local _, _, add3 = Ghost.cycleFit(spr, s3)
+    check(loaded.addFrames == false and add3 == 0 and Ghost.apply(spr, s3, lib.clips.Run, rig) == nil
+          and #spr.frames == 8, "a saved addFrames = " .. type(v) .. " " .. tostring(v) .. " is off (" .. #spr.frames .. " frames)")
+  end
+
   -- A tag range never grows: the option applies to All frames only.
   local tag = spr:newTag(2, 4)
   tag.name = "hop"

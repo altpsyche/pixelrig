@@ -61,7 +61,7 @@ return function(Clip, Rig, Render, Colors, Util)
     local first, last = Ghost.scopeRange(sprite, s.scope)
     if not first then return nil end
     local N, len = s.frames, last - first + 1
-    local add = (s.scope == Ghost.ALL and s.addFrames) and math.max(0, N - len) or 0
+    local add = (s.scope == Ghost.ALL and s.addFrames == true) and math.max(0, N - len) or 0
     return math.min(N, len + add), N, add
   end
 
@@ -94,6 +94,9 @@ return function(Clip, Rig, Render, Colors, Util)
       }
     end
     data.color, data.color2 = nil, nil
+    -- ADR-0005: the option is on only when saved as true; any other value (a hand-edited "false",
+    -- a number) is off.
+    data.addFrames = data.addFrames == true
     return Util.merge(Ghost.DEFAULTS, data)
   end
 
