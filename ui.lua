@@ -39,6 +39,14 @@ return function(M)
     return v
   end
 
+  -- Calls fn on every change to sprite (an edit, undo or redo). Returns a function that stops it,
+  -- or nil where this Aseprite has no sprite events; tests replace it to take that path.
+  function UI.watchSprite(sprite, fn)
+    local ok, key = pcall(function() return sprite.events:on("change", fn) end)
+    if not ok then return nil end
+    return function() pcall(function() sprite.events:off(key) end) end
+  end
+
   function UI.open()
     local sprite = app.sprite
     if not sprite then
@@ -266,7 +274,8 @@ return function(M)
       S.clipData = dirty and Clip.export(work) or nil
       local err = Ghost.apply(sprite, S, work, lib.rigs[work.rig])
       if err then app.alert(err) end
-      -- Apply changed the sprite, so composite the art again, as on any sprite change (artChanged).
+      -- Apply changed the sprite, so composite the art again. artChanged does it too, but only
+      -- where this Aseprite has sprite events (UI.watchSprite).
       bgCache = {}
       refreshFit()
     end
@@ -617,12 +626,11 @@ return function(M)
       bgCache = {}
       if dlg then dlg:repaint() end
     end
-    local okEvents, artListener = pcall(function() return sprite.events:on("change", artChanged) end)
-    if not okEvents then artListener = nil end
+    local unwatch = UI.watchSprite(sprite, artChanged)
 
     dlg = Dialog { title = "PixelRig: Ghost Reference", onclose = function()
       playTimer:stop(); changeTimer:stop(); applyTimer:stop()
-      if artListener then pcall(function() sprite.events:off(artListener) end) end
+      if unwatch then unwatch() end
     end }
 
     -- Without tabs (v1.3-rc6) every section is a separate page; a shorter preview keeps the

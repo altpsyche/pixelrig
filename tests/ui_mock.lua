@@ -630,6 +630,47 @@ click("remove")
 check(M.Ghost.findLayer(spr, M.Ghost.ALL) == nil, "remove ghost")
 click("close")
 
+-- Closing the dialog stops it listening to its sprite (#8 review): a later edit repaints nothing.
+-- A sprite of its own, since the first dialog above was replaced without being closed.
+do
+  local fresh = Sprite(32, 32, ColorMode.RGB)
+  app.sprite = fresh
+  for k in pairs(widgets) do widgets[k] = nil end
+  M.UI.open()
+  local cel = fresh.cels[1]
+  local r0 = repaints
+  app.transaction("art edit", function() cel.image:drawPixel(3, 3, app.pixelColor.rgba(0, 255, 0, 255)) end)
+  local open = repaints - r0
+  click("close")
+  r0 = repaints
+  app.transaction("art edit", function() cel.image:drawPixel(4, 4, app.pixelColor.rgba(0, 255, 0, 255)) end)
+  check(open == 1 and repaints == r0, string.format(
+    "a dialog repaints on a sprite edit while open (%d) and not once closed (%d)", open, repaints - r0))
+  fresh:close()
+  app.sprite = spr
+end
+
+-- Where this Aseprite has no sprite events, Apply still composites the art again (#8 review).
+do
+  local watch = M.UI.watchSprite
+  M.UI.watchSprite = function() return nil end
+  for k in pairs(widgets) do widgets[k] = nil end
+  app.sprite = spr
+  M.UI.open()
+  local composites = 0
+  local composite = M.Ghost.composite
+  M.Ghost.composite = function(...) composites = composites + 1; return composite(...) end
+  widgets.preview.t.onpaint({ context = fakeGC(280, 220) })
+  composites = 0
+  click("apply")
+  widgets.preview.t.onpaint({ context = fakeGC(280, 220) })
+  M.Ghost.composite = composite
+  M.UI.watchSprite = watch
+  check(composites == 1, "with no sprite events, Apply composites the art again (" .. composites .. " composites)")
+  click("remove")
+  click("close")
+end
+
 -- Ghosts wherever they are (#6): one moved into a group and one whose tag was renamed. Range lists
 -- the orphan in its existing combobox, no new row; Apply on it says so, auto-apply stays silent,
 -- and Remove clears it and falls back to All frames. Remove on All frames finds the grouped ghost.
