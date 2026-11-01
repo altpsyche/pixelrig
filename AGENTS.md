@@ -9,7 +9,7 @@ view first, humanoid first.
 
 **Constitution.** PixelRig never edits the artist's pixels: it writes only to layers and tags it
 owns and marks (`pixelrig-ghost`). It adds frames or changes frame durations only when the artist
-turns on that option for the change ([ADR-0005](docs/adr/0005-timeline-changes-opt-in.md)).
+has turned on that option, off by default ([ADR-0005](docs/adr/0005-timeline-changes-opt-in.md)).
 Every change to a sprite is one undo step, and a preview never changes the sprite. It ships as a
 plain Lua extension: no native helper, no network, no Aseprite build or fork given to users
 (Aseprite EULA). It never generates final art with AI. A new motion is data (a clip file), not

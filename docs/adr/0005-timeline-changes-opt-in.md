@@ -4,9 +4,11 @@ PixelRig's constitution says it writes only to layers and tags it owns. A ghost 
 as its cycle, and the clip has a natural timing, so Apply can be useful when it adds frames to a
 short sprite or sets the cycle's frame durations; but both change the artist's timeline, which the
 artist owns. The owner ruled on 2026-11-01 (#17): **adding frames and setting frame durations are
-allowed, each only behind an explicit option the artist turns on for that Apply, off by default.**
-Without the option, the ghost fills the frames the sprite already has and leaves every duration as
-it is. Both changes stay inside Apply's single undo step.
+allowed, each only behind an explicit option that is off by default and that the artist turns
+on.** A ghost may remember the option with its settings once the artist has turned it on; it is
+never on for a ghost the artist has not set it for. Without the option, the ghost fills the frames
+the sprite already has and leaves every duration as it is. Both changes stay inside Apply's single
+undo step.
 
 ## Considered options
 
