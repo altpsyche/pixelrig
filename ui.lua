@@ -90,6 +90,8 @@ return function(M)
     local function loadScope(scope)
       local s = Ghost.loadSettings(Ghost.findLayer(sprite, scope))
       if not s then s = defaultsFor(scope) end
+      -- Saved values may lie outside the sliders, as after the canvas shrank (#44).
+      Ghost.clampPlace(s, sprite)
       s.scope = scope
       if not lib.clips[s.clip] then s.clip = lib.names[1] end
       S = s
@@ -620,10 +622,11 @@ return function(M)
     W:combobox { id = "facing", label = "Facing", option = S.facing, options = { "Right", "Left" }, onchange = changed }
 
     sec:begin("secPlace")
+    local lim = Ghost.placeLimits(sprite)
     W:button { id = "fit", text = "Fit to art (selection, else all visible art)", onclick = onFit }
-    W:slider { id = "height", label = "Height px", min = 8, max = max(16, sprite.height * 2), value = S.height, onchange = changed }
-    W:slider { id = "groundY", label = "Ground Y", min = 0, max = sprite.height - 1, value = S.groundY, onchange = changed }
-    W:slider { id = "cx", label = "Center X", min = 0, max = sprite.width, value = S.cx, onchange = changed }
+    W:slider { id = "height", label = "Height px", min = lim.height.min, max = lim.height.max, value = S.height, onchange = changed }
+    W:slider { id = "groundY", label = "Ground Y", min = lim.groundY.min, max = lim.groundY.max, value = S.groundY, onchange = changed }
+    W:slider { id = "cx", label = "Center X", min = lim.cx.min, max = lim.cx.max, value = S.cx, onchange = changed }
 
     sec:begin("secLook")
     W:combobox { id = "style", label = "Style", option = S.style, options = Render.STYLES, onchange = changed }

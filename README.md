@@ -32,7 +32,7 @@ View → Ghost Reference... opens a dialog with an animated preview over your ar
 
 **Body tab.** Presets (Default, Heroic, Chibi, Stocky) or custom head / torso / arms / legs / bulk. Facing.
 
-**Place tab.** Fit to art: uses the selection, else all visible art layers together (ghost and reference layers left out), whichever layer is active. It measures the dialog's own sprite only, at the active frame when that sprite is active, else at frame 1. Height, ground line, center X. A new ghost auto-fits on first open.
+**Place tab.** Fit to art: uses the selection, else all visible art layers together (ghost and reference layers left out), whichever layer is active. It measures the dialog's own sprite only, at the active frame when that sprite is active, else at frame 1. Height, ground line, center X. A fit, or a saved value, outside a slider's range is clamped to it: art shorter than 8px gets the 8px minimum height, standing on the art's ground (#44). A new ghost auto-fits on first open.
 
 **Look tab.** Stick, Capsule, Joints + arcs. Line width, pixel-perfect 1px lines, opacity. Under **Colors**, color schemes, each with its own pickers (picks are kept per scheme; Reset colors restores defaults):
 

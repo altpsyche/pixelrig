@@ -378,10 +378,45 @@ end
 local opened, why = reopenWith(json.encode({ style = "Capsule", clip = "Run", clipData = { name = "Run" } }))
 check(opened and widgets.style.value == "Capsule" and widgets.dirtyInfo.value == "Clip unchanged",
       "corrupt edited clip in settings -> library clip " .. tostring(why or ""))
+-- Saved Place values outside the sliders' ranges, as after the canvas shrank (#44): the dialog
+-- opens with each clamped to its slider.
+opened, why = reopenWith(json.encode({ height = 500, groundY = 999, cx = -5 }))
+check(opened and widgets.height.value == 128 and widgets.groundY.value == 63 and widgets.cx.value == 0,
+      "saved Place values out of range open clamped " .. tostring(why or ""))
 check(widgets.addFrames.value == false, "a ghost saved without the option opens with Add frames off")
 opened, why = reopenWith(json.encode({ addFrames = "false" }))
 check(opened and widgets.addFrames.value == false, "a ghost saved with addFrames = \"false\" opens with Add frames off"
       .. (why and (" (" .. tostring(why) .. ")") or ""))
+
+-- Art shorter than the Height minimum (#44): first-open auto-fit and the Fit button, with a
+-- selection 3px tall, both clamp to the 8px minimum, and the dialog stays usable.
+do
+  click("close")
+  for k in pairs(widgets) do widgets[k] = nil end
+  local tiny = Sprite(32, 32, ColorMode.RGB)
+  local dot = Image(32, 32, ColorMode.RGB)
+  for y = 25, 29 do for x = 14, 17 do dot:drawPixel(x, y, app.pixelColor.rgba(200, 80, 40, 255)) end end
+  tiny.cels[1].image = dot
+  app.sprite = tiny
+  local opened2, why2 = pcall(M.UI.open)
+  check(opened2 and widgets.height.value == 8 and widgets.groundY.value == 29 and widgets.cx.value == 16,
+        "art 5px tall: dialog opens, auto-fit clamped to the 8px Height minimum " .. tostring(why2 or ""))
+  if opened2 then
+    tiny.selection = Selection(Rectangle(2, 10, 6, 3))
+    set("height", 20)
+    local fitted, why3 = pcall(click, "fit")
+    check(fitted and widgets.height.value == 8 and widgets.groundY.value == 12 and widgets.cx.value == 5,
+          "a selection 3px tall: Fit clamps to the 8px Height minimum " .. tostring(why3 or ""))
+    local applied2, why4 = pcall(click, "apply")
+    local g = M.Ghost.findLayer(tiny, M.Ghost.ALL)
+    check(applied2 and g and M.Ghost.loadSettings(g).height == 8,
+          "after a clamped Fit, Apply writes an 8px ghost " .. tostring(why4 or ""))
+    click("close")
+  end
+  tiny:close()
+  app.sprite = spr
+  app.layer = layer
+end
 
 -- Drag every joint on a clip without leg.thigh or arm.shoulder: nothing raises (#4).
 do
