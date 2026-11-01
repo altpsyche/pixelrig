@@ -465,8 +465,10 @@ return function(Clip, Rig, Render, Colors, Util)
   -- own renderer in C++, for every color mode: a per-pixel Lua loop took about a second per frame
   -- on a 1024x1024 indexed sprite (#8). The renderer skips hidden and reference layers, and a
   -- ghost layer is always a reference layer (ensureLayer; Lua cannot unset the flag), so the art
-  -- is what it was. Layer and cel opacity and blend modes now apply on indexed and gray sprites
-  -- too; the loop drew their pixels opaque over the layers below.
+  -- is what it was. It blends as the canvas does: layer blend modes on every color mode, layer and
+  -- cel opacity on indexed and gray sprites too, and group opacity when the experimental Compose
+  -- groups preference is on, which the canvas reads as well. The old composite drew every layer
+  -- in Normal mode, and indexed and gray pixels opaque.
   function Ghost.composite(sprite, frameNumber)
     local img = Image(sprite.width, sprite.height, ColorMode.RGB)
     img:clear()
