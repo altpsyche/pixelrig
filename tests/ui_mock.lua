@@ -35,7 +35,11 @@ end
 for _, k in ipairs({ "canvas", "button", "slider", "combobox", "check", "color", "label", "entry", "tab" }) do
   mock[k] = function(self, t) return add(k, t) end
 end
-function mock:separator() return self end
+-- Like Aseprite: a separator with an id can be modified; one without is not tracked.
+function mock:separator(t)
+  if type(t) == "table" and t.id then return add("separator", t) end
+  return self
+end
 function mock:endtabs(t) return add("endtabs", t) end
 function mock:show() return self end
 function mock:close() if self._onclose then self._onclose() end end
@@ -63,7 +67,12 @@ function mock:modify(t)
     error(t.id .. " value " .. w.value .. " outside " .. w.min .. ".." .. w.max)
   end
 end
+-- notabs=1: a Dialog like Aseprite v1.3-rc6 (Lua API 25), where reading tab/endtabs raises.
+local NOTABS = app.params.notabs == "1"
+if NOTABS then mock.tab, mock.endtabs = nil, nil end
+
 setmetatable(mock, { __index = function(_, k)
+  if NOTABS and (k == "tab" or k == "endtabs") then error("Field " .. k .. " does not exist") end
   if k == "data" then
     local d = {}
     for id, w in pairs(widgets) do d[id] = w.value end
@@ -77,13 +86,26 @@ Timer = function(t)
            start = function(self) self.running = true; self.ontick() end, stop = function(self) self.running = false end }
 end
 
-local function set(id, v)
+local function setRaw(id, v)
   local w = widgets[id]
   w.value = v
   local cb = w.t.onchange or w.t.onclick
   if cb then cb() end
 end
-local function click(id) widgets[id].t.onclick() end
+
+-- No tabs: a control is only usable if some section shows it. Switch to that section first,
+-- and fail when no section does.
+local function reach(id)
+  if not NOTABS or id == "section" or widgets[id].visible ~= false then return end
+  for _, name in ipairs(widgets.section.options) do
+    setRaw("section", name)
+    if widgets[id].visible then return end
+  end
+  check(false, "no tabs: " .. id .. " is reachable through the section picker")
+end
+
+local function set(id, v) reach(id); setRaw(id, v) end
+local function click(id) reach(id); widgets[id].t.onclick() end
 
 -- Fake graphics context
 local function fakeGC(w, h)
@@ -109,9 +131,15 @@ tag.name = "idle"
 local ok, err = pcall(M.UI.open)
 check(ok, "dialog opens " .. tostring(err or ""))
 if not ok then error(err) end
+-- Visibility right after opening, before any interaction switches section.
+local openedMotionOnly = widgets.clip.visible and not (widgets.param1.visible or widgets.travel.visible
+  or widgets.preset.visible or widgets.fit.visible or widgets.style.visible or widgets.c1.visible
+  or widgets.ease.visible)
 
 check(widgets.height.value == 40 and widgets.groundY.value == 59, "auto-fit on first open")
-check(widgets.param1.visible == true and widgets.param6.visible == false and widgets.param1.value == 100,
+-- (in picker mode the sliders sit in the Clip section, checked below)
+check((NOTABS or (widgets.param1.visible == true and widgets.param6.visible == false))
+      and widgets.param1.label == "Stride %" and widgets.param1.value == 100,
       "param sliders relabelled for Run")
 
 -- paint
@@ -149,6 +177,46 @@ check(widgets.pHead.value == 200, "preset applies proportions")
 set("pLegs", 90)
 check(widgets.preset.value == "Custom", "manual proportion -> Custom")
 
+-- sections: tabs when the Dialog has them, else a section picker (#40)
+if NOTABS then
+  check(widgets.section ~= nil and widgets.tabMotion == nil, "no tabs: section picker instead of tabs")
+  local opts = table.concat(widgets.section.options, ",")
+  check(opts == "Motion,Clip,Travel,Body,Place,Look,Colors,Pose", "no tabs: one short section per part (" .. opts .. ")")
+  check(openedMotionOnly, "no tabs: the dialog opens on the Motion section only")
+  -- Every section shows exactly its own controls.
+  local SECTIONS = {
+    Motion = { "clip", "scope", "frames", "fps", "fillAll", "timing", "labels" },
+    Clip = { "param1", "param2", "param3", "param4", "param5" },
+    Travel = { "travel", "travelSpeed", "footprints", "groundLine" },
+    Body = { "preset", "pHead", "pTorso", "pArms", "pLegs", "pBulk", "facing" },
+    Place = { "fit", "height", "groundY", "cx" },
+    Look = { "style", "thickness", "pixelPerfect", "opacity", "showArt" },
+    Colors = { "colorScheme", "c1", "resetColors" },
+    Pose = { "help", "help2", "segment", "ease", "dirtyInfo", "clipName", "saveClip", "revert" },
+  }
+  for _, name in ipairs(widgets.section.options) do
+    setRaw("section", name)
+    local okSection = true
+    for other, ids in pairs(SECTIONS) do
+      for _, id in ipairs(ids) do
+        if (widgets[id].visible == true) ~= (other == name) then okSection = false end
+      end
+    end
+    check(okSection, "no tabs: section " .. name .. " shows its own controls and hides the rest")
+  end
+  -- Controls outside the sections stay visible whatever section is shown.
+  check(widgets.frame.visible and widgets.apply.visible and widgets.preview.visible,
+        "no tabs: preview, transport and Apply stay visible")
+  set("section", "Clip")
+  check(widgets.param1.visible and widgets.param5.visible and not widgets.param6.visible and not widgets.clip.visible,
+        "no tabs: Clip shows this clip's param sliders only")
+  set("section", "Colors")
+  check(widgets.c1.visible and not widgets.c2.visible and not widgets.style.visible and not widgets.param1.visible,
+        "no tabs: Colors shown, others hidden, color slots keep their own visibility")
+else
+  check(widgets.tabMotion ~= nil and widgets.section == nil, "tabs: dialog uses tabs")
+end
+
 -- color schemes: pickers relabel per scheme, picks persist per scheme
 check(widgets.c1.visible and widgets.c1.label == "Body" and widgets.c2.visible == false, "Mono shows one picker")
 set("colorScheme", "Limbs")
@@ -161,6 +229,11 @@ check(widgets.c2.value.red == 1 and widgets.c2.value.blue == 3, "Limbs pick surv
 click("resetColors")
 check(widgets.c2.value.red == 255, "reset colors restores scheme defaults")
 set("colorScheme", "Segments")
+if NOTABS then
+  set("section", "Clip")
+  check(not widgets.c8.visible and widgets.param1.visible and not widgets.param6.visible,
+        "no tabs: back to Clip hides colors, param sliders keep their own visibility")
+end
 
 set("style", "Joints + arcs"); set("travel", true)
 
@@ -201,5 +274,5 @@ click("remove")
 check(M.Ghost.findLayer(spr, M.Ghost.ALL) == nil, "remove ghost")
 click("close")
 
-print(failures == 0 and "ALL PASSED" or (failures .. " FAILED"))
+print((NOTABS and "[no tabs] " or "[tabs] ") .. (failures == 0 and "ALL PASSED" or (failures .. " FAILED")))
 if failures > 0 then error(failures .. " test(s) failed") end
