@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # PixelRig's project checks, run by scripts/verify.sh (and so by CI and the pre-push hook).
-#   tools/check.sh                       Lua syntax, clip/rig JSON, release gate, release archive,
-#                                        tools/test.sh self-test
+#   tools/check.sh                       Lua syntax, pure-Lua tests, clip/rig JSON, release gate,
+#                                        release archive, tools/test.sh self-test
 #   ASEPRITE=/path/to/aseprite tools/check.sh   plus the Aseprite batch tests
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -12,6 +12,18 @@ if [ -n "$luac_bin" ]; then
   "$luac_bin" -p ./*.lua tests/*.lua
 else
   echo "verify: luac not found, Lua syntax check skipped (CI runs it)" >&2
+fi
+
+# Pure-Lua tests (tests/pure.lua): clip, rig, stamps, colors and render under plain Lua 5.4, no
+# Aseprite, so CI runs them (#12). Only a Lua 5.4 interpreter, as Aseprite embeds.
+lua_bin="$(command -v lua5.4 || true)"
+if [ -z "$lua_bin" ] && command -v lua >/dev/null && [ "$(lua -e 'io.write(_VERSION)')" = "Lua 5.4" ]; then
+  lua_bin="$(command -v lua)"
+fi
+if [ -n "$lua_bin" ]; then
+  "$lua_bin" tests/pure.lua
+else
+  echo "verify: no Lua 5.4 interpreter, pure-Lua tests skipped (CI runs them)" >&2
 fi
 
 # Clips and rigs: every JSON file parses.
