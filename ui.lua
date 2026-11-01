@@ -237,6 +237,7 @@ return function(M)
     end
 
     -- Pose editing -----------------------------------------------------------
+    -- A channel the clip lacks reads as 0, as Rig.solve draws it.
     local function editJoint(dr, x, y)
       local fr = build.frames[dr.frame]
       local sk, pose, rig = fr.sk, fr.pose, build.rig
@@ -247,14 +248,14 @@ return function(M)
       if id:find("knee$") then
         ch, val = "leg.thigh", Rig.angleFromDown(x - sk.hip.x, y - sk.hip.y)
       elseif id:find("ankle$") then
-        ch, val = "leg.knee", ps["leg.thigh"] - Rig.angleFromDown(x - s.knee.x, y - s.knee.y)
+        ch, val = "leg.knee", (ps["leg.thigh"] or 0) - Rig.angleFromDown(x - s.knee.x, y - s.knee.y)
       elseif id:find("toe$") then
         ch = "leg.foot"
         val = math.deg(math.atan(y - s.ankle.y, x - s.ankle.x)) - math.deg(math.atan(rig.bones.ankleH, rig.bones.foot))
       elseif id:find("elbow$") then
         ch, val = "arm.shoulder", Rig.angleFromDown(x - sk.shoulder.x, y - sk.shoulder.y)
       elseif id:find("hand$") then
-        ch, val = "arm.elbow", Rig.angleFromDown(x - s.elbow.x, y - s.elbow.y) - ps["arm.shoulder"]
+        ch, val = "arm.elbow", Rig.angleFromDown(x - s.elbow.x, y - s.elbow.y) - (ps["arm.shoulder"] or 0)
       elseif id == "neck" then
         ch, val = "torso.lean", Rig.angleFromUp(x - sk.hip.x, y - sk.hip.y)
       elseif id == "head" then

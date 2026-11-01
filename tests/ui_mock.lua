@@ -301,6 +301,52 @@ local opened, why = reopenWith(json.encode({ style = "Capsule", clip = "Run", cl
 check(opened and widgets.style.value == "Capsule" and widgets.dirtyInfo.value == "Clip unchanged",
       "corrupt edited clip in settings -> library clip " .. tostring(why or ""))
 
+-- Drag every joint on a clip without leg.thigh or arm.shoulder: nothing raises (#4).
+do
+  local data = M.Util.readJson(app.fs.joinPath(root, "clips", "run.json"))
+  data.name = "No upper limbs"
+  data.channels["leg.thigh"], data.channels["arm.shoulder"] = nil, nil
+  local file = app.fs.joinPath(M.userClipsDir(), "no-upper-limbs.json")
+  M.Util.writeJson(file, data)
+  reopenWith(json.encode({ clip = "No upper limbs" }))
+  os.remove(file)
+  check(widgets.clip.value == "No upper limbs", "clip without thigh and shoulder channels loads")
+
+  local handles = M.Render.handles
+  local errors, dragged = {}, 0
+  local ids = {}
+  for _, h in ipairs(handles({ near = {}, far = {} })) do table.insert(ids, h.id) end
+  for _, id in ipairs(ids) do
+    click("revert") -- a fresh clip each time: dragging a knee or elbow would add the missing channel
+    -- Offer only this handle, find where the preview draws it, then press, drag and release there.
+    M.Render.handles = function(sk)
+      for _, h in ipairs(handles(sk)) do
+        if h.id == id then return { h } end
+      end
+      return {}
+    end
+    local spot
+    local g = fakeGC(widgets.preview.t.width, widgets.preview.t.height)
+    function g:fillRect(r) if r.width == 5 and not spot then spot = { x = r.x + 2, y = r.y + 2 } end end
+    widgets.preview.t.onpaint({ context = g })
+    if spot then
+      local r0 = repaints
+      local okDrag, e = pcall(function()
+        widgets.preview.t.onmousedown({ x = spot.x, y = spot.y, button = MouseButton.LEFT })
+        widgets.preview.t.onmousemove({ x = spot.x + 5, y = spot.y + 4 })
+        widgets.preview.t.onmouseup({ x = spot.x + 5, y = spot.y + 4 })
+      end)
+      if not okDrag then table.insert(errors, id .. ": " .. tostring(e)) end
+      if repaints > r0 then dragged = dragged + 1 end
+    else
+      table.insert(errors, id .. ": handle not drawn")
+    end
+  end
+  M.Render.handles = handles
+  check(#errors == 0, "dragging any joint on a clip missing channels does not raise " .. table.concat(errors, "; "))
+  check(dragged == #ids, string.format("every joint drags (%d of %d)", dragged, #ids))
+end
+
 click("remove")
 check(M.Ghost.findLayer(spr, M.Ghost.ALL) == nil, "remove ghost")
 click("close")
