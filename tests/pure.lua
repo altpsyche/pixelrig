@@ -216,6 +216,8 @@ do
 
   local lift = clip { channels = { ["root.lift"] = { keys = { { 0, -1 } } } } }
   check(Clip.sample(lift, 0)["root.lift"] == 0, "negative root.lift clamps to 0")
+  local up = clip { channels = { ["root.lift"] = { keys = { { 0, 0.2 } } } } }
+  check(near(Clip.sample(up, 0)["root.lift"], 0.2), "positive root.lift is kept")
 
   local pr = Clip.sample(run, 0)
   check(type(pr.near["leg.thigh"]) == "number" and type(pr.far["leg.thigh"]) == "number"
@@ -256,6 +258,14 @@ do
         "inserted key is sorted in and sampled back")
   Clip.setPoseKey(c, "a.x", 0.3, nil, 9, 4)
   check(#keys == 3 and near(keys[2][1], 0.3) and keys[2][2] == 9, "a key within half a frame is replaced and snapped")
+  -- Half a frame at 4 frames is a tolerance of 0.1125 either side of the key at 0.5.
+  local after, before, outside = clip(), clip(), clip()
+  Clip.setPoseKey(after, "a.x", 0.6, nil, 1, 4)
+  Clip.setPoseKey(before, "a.x", 0.4, nil, 1, 4)
+  Clip.setPoseKey(outside, "a.x", 0.37, nil, 1, 4)
+  check(#after.channels["a.x"].keys == 2 and #before.channels["a.x"].keys == 2,
+        "a key just after or just before the edit is replaced")
+  check(#outside.channels["a.x"].keys == 3, "an edit just over half a frame away inserts a key")
   Clip.setPoseKey(c, "a.x", 0.98, nil, 1, 4)
   check(#keys == 3 and near(keys[3][1], 0.98) and keys[3][2] == 1 and near(keys[1][1], 0.3),
         "a key within half a frame across the cycle end is replaced")
@@ -278,6 +288,12 @@ do
   local m = clip { marks = { { t = 0, name = "contact" }, { t = 0.5, name = "pass" } } }
   check(Clip.markForFrame(m, 0, 8) == "contact" and Clip.markForFrame(m, 4, 8) == "pass"
         and Clip.markForFrame(m, 1, 8) == nil, "markForFrame names frames on a mark")
+  -- Half a frame at 8 frames is 0.0625: a mark just either side of frame 4 (t 0.5) names it.
+  local late = clip { marks = { { t = 0.55, name = "late" } } }
+  local early = clip { marks = { { t = 0.45, name = "early" } } }
+  local far = clip { marks = { { t = 0.57, name = "far" } } }
+  check(Clip.markForFrame(late, 4, 8) == "late" and Clip.markForFrame(early, 4, 8) == "early"
+        and Clip.markForFrame(far, 4, 8) == nil, "markForFrame: within half a frame either side, not beyond")
 end
 
 -- Rig: solving and grounding ---------------------------------------------------
@@ -336,7 +352,10 @@ do
         "3px ring is the hand-drawn plus")
   local f5 = set(Stamps.circle(5, true))
   check(count(f5) == 21 and f5["2,2"] and not f5["0,0"], "5px filled stamp fills its ring")
-  check(Stamps.circle(4.4, false) == Stamps.circle(4, false), "diameters round and stamps are cached")
+  check(Stamps.circle(4.4, false) == Stamps.circle(4, false), "diameters round down below .5, stamps cached")
+  check(Stamps.circle(4.6, false) == Stamps.circle(5, false) and Stamps.circle(4.5, false) == Stamps.circle(5, false),
+        "diameters round up from .5")
+  check(#Stamps.circle(0.2, true) == 1, "diameters under 1 draw one pixel")
   local r12 = Stamps.circle(12, false)
   local sym = true
   local s12 = set(r12)
@@ -349,6 +368,16 @@ do
   local g = set(got)
   check(#got == 4 and got[1][3] == "c" and g["10,19"] and g["9,20"] and g["11,20"] and g["10,21"],
         "draw centres the stamp on (cx, cy)")
+  local function drawn(d)
+    local t = {}
+    Stamps.draw(function(x, y) t[#t + 1] = { x, y } end, 10, 20, d, false, "c")
+    return set(t)
+  end
+  local up, down = drawn(2.6), drawn(2.4)
+  check(count(up) == 4 and up["10,19"] and up["9,20"] and up["11,20"] and up["10,21"],
+        "draw rounds a diameter up from .5 (2.6 draws the 3px plus)")
+  check(count(down) == 4 and down["9,19"] and down["10,19"] and down["9,20"] and down["10,20"],
+        "draw rounds a diameter down below .5 (2.4 draws the 2px block)")
 end
 
 -- Colors ------------------------------------------------------------------------
