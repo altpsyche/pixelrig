@@ -196,19 +196,18 @@ return function(M)
       dlg:modify { id = "dirtyInfo", text = dirty and ("Edited '" .. work.name .. "' (kept with ghost on Apply)") or "Clip unchanged" }
     end
 
-    -- One line when the cycle does not fit the range: how much fits, or what Apply adds (#27).
-    -- Add frames applies to All frames only; a tag range never grows.
+    -- The Add frames check says what Apply does with a cycle longer than the range (#27): how
+    -- much fits, or how many frames it adds. Its own text, so it costs no extra row on small
+    -- screens. Add frames applies to All frames only; a tag range never grows.
     local function refreshFit()
-      dlg:modify { id = "addFrames", enabled = S.scope == Ghost.ALL }
       local fit, cycle, add = Ghost.cycleFit(sprite, S)
-      local text
+      local text = "Add frames"
       if add and add > 0 then
-        text = string.format("Apply adds %d frame%s", add, add == 1 and "" or "s")
+        text = string.format("Add %d frame%s", add, add == 1 and "" or "s")
       elseif fit and fit < cycle then
-        text = string.format("%d of %d cycle frames fit", fit, cycle)
+        text = string.format("Add frames (%d of %d fit)", fit, cycle)
       end
-      dlg:modify { id = "fitInfo", text = text or "" }
-      sec:setVisible("fitInfo", text ~= nil)
+      dlg:modify { id = "addFrames", text = text, enabled = S.scope == Ghost.ALL }
     end
 
     local function rebuild()
@@ -595,7 +594,6 @@ return function(M)
     -- Both change the artist's timeline, so both are opt-in and off by default (ADR-0005).
     W:check { id = "addFrames", label = "Timeline", text = "Add frames", selected = S.addFrames, onclick = changed }
     W:check { id = "timing", text = "Set frame durations", selected = S.timing, onclick = changed }
-    W:label { id = "fitInfo", text = "", visible = false }
     sec:begin("secClip")
     for i = 1, MAXP do
       W:slider { id = "param" .. i, label = "Param", min = 0, max = 100, value = 0, visible = false, onchange = changed }
