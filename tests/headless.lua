@@ -39,6 +39,8 @@ do
   write("badkey", function(d) d.channels["leg.knee"].keys[1] = { "x" } end)
   write("noparamchannels", function(d) d.params[1].channels = nil end)
   write("nodefault", function(d) d.params[1].default = nil end)
+  write("badrepeat", function(d) d.channels["leg.knee"]["repeat"] = "x" end)
+  write("boolrepeat", function(d) d.channels["leg.knee"]["repeat"] = true end)
   local function writeText(path, text)
     local f = io.open(path, "w")
     f:write(text)
@@ -72,9 +74,11 @@ do
     skipped("badkey", "channel 'leg.knee'")
     skipped("noparamchannels", "param 'stride'")
     skipped("nodefault", "param 'stride'")
+    skipped("badrepeat", "channel 'leg.knee' has a bad repeat")
+    skipped("boolrepeat", "channel 'leg.knee' has a bad repeat")
     skipped("brokenrig", "rig 'brokenrig' is unreadable")
     skipped("notjson", "not valid JSON")
-    check(#(badLib.skipped or {}) == 8, "library: exactly the bad clips skipped (" .. #(badLib.skipped or {}) .. ")")
+    check(#(badLib.skipped or {}) == 10, "library: exactly the bad clips skipped (" .. #(badLib.skipped or {}) .. ")")
     local oneLine = true
     for _, s in ipairs(badLib.skipped or {}) do
       if s.reason:find("\n", 1, true) or #s.reason > 60 then oneLine = false end

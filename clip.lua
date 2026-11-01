@@ -38,6 +38,9 @@ function Clip.check(data)
     if type(ch) ~= "table" or not isList(ch.keys) then
       return "channel '" .. tostring(name) .. "' has no keys"
     end
+    if ch["repeat"] ~= nil and type(ch["repeat"]) ~= "number" then
+      return "channel '" .. tostring(name) .. "' has a bad repeat"
+    end
     for _, k in ipairs(ch.keys) do
       if type(k) ~= "table" or type(k[1]) ~= "number" or type(k[2]) ~= "number" then
         return "channel '" .. tostring(name) .. "' has a bad key"
