@@ -90,6 +90,35 @@ do
   end
 end
 
+-- Library: of two user files with one clip name, the first by file name loads (#7).
+do
+  local dir = app.fs.joinPath(out, "saveclips")
+  app.fs.makeAllDirectories(dir)
+  for _, file in ipairs(app.fs.listFiles(dir)) do os.remove(app.fs.joinPath(dir, file)) end
+  local run = Util.readJson(app.fs.joinPath(root, "clips", "run.json"))
+  local function put(file, name, fps)
+    local d = Util.deepCopy(run)
+    d.name, d.fps = name, fps
+    Util.writeJson(app.fs.joinPath(dir, file), d)
+  end
+  -- Two older files carrying one clip name: the first in name order wins, the other is listed.
+  put("b-old.json", "Dup", 11)
+  put("a-old.json", "Dup", 12)
+  local userDir = M.userClipsDir
+  M.userClipsDir = function() return dir end
+  local dupLib = M.loadLibrary()
+  local dup = dupLib.clips.Dup
+  check(dup and dup.fps == 12 and dup.file == app.fs.joinPath(dir, "a-old.json"),
+        "library: duplicate clip name loads the first file by name (" .. tostring(dup and dup.file) .. ")")
+  local listed = false
+  for _, s in ipairs(dupLib.skipped) do
+    if s.file == "b-old.json" and s.reason:find("a-old.json", 1, true) then listed = true end
+  end
+  check(listed, "library: the shadowed duplicate is listed as skipped")
+  check(dup and Clip.export(dup).file == nil and Clip.export(dup).origin == nil, "export drops runtime fields")
+  M.userClipsDir = userDir
+end
+
 local function settings(over)
   local s = Util.merge(Ghost.DEFAULTS, over or {})
   return s

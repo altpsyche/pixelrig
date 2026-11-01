@@ -96,7 +96,7 @@ function Clip.clone(clip) return deepCopy(clip) end
 -- Serializable copy (no runtime fields).
 function Clip.export(clip)
   local c = deepCopy(clip)
-  c.origin = nil
+  c.origin, c.file = nil, nil
   return c
 end
 

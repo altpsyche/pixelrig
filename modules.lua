@@ -18,7 +18,8 @@ return function(dir)
 
   function M.rigsDir() return app.fs.joinPath(dir, "rigs") end
 
-  -- Built-in clips + user clips (user dir wins on name clash only if not built-in).
+  -- Built-in clips + user clips. A user clip named like a built-in is left out; of two user files
+  -- with one clip name, the first by file name loads and the other is skipped.
   -- A file that cannot be used is left out and listed in lib.skipped as { file, origin, reason },
   -- the reason one short line for the artist; loading itself never raises.
   function M.loadLibrary()
@@ -38,19 +39,28 @@ return function(dir)
     end
     local function scan(folder, origin)
       if not app.fs.isDirectory(folder) then return end
-      for _, file in ipairs(app.fs.listFiles(folder)) do
+      -- Name order, so which of two files with one clip name loads never depends on the disk.
+      local files = app.fs.listFiles(folder)
+      table.sort(files)
+      for _, file in ipairs(files) do
         if file:match("%.json$") then
           local function skip(reason)
             table.insert(lib.skipped, { file = file, origin = origin, reason = reason })
           end
-          local ok, clip = pcall(M.Clip.load, app.fs.joinPath(folder, file), origin)
+          local path = app.fs.joinPath(folder, file)
+          local ok, clip = pcall(M.Clip.load, path, origin)
           local rigReason = ok and needRig(clip.rig)
+          local have = ok and lib.clips[clip.name]
           if not ok then
             skip(tostring(clip))
           elseif rigReason then
             skip(rigReason)
-          elseif not (lib.clips[clip.name] and lib.clips[clip.name].origin == "builtin") then
-            if not lib.clips[clip.name] then table.insert(lib.names, clip.name) end
+          elseif have and origin == "user" and have.origin == "user" then
+            -- Never let a second file silently replace the first (#7).
+            skip("same clip name as " .. app.fs.fileName(have.file))
+          elseif not (have and have.origin == "builtin") then
+            if not have then table.insert(lib.names, clip.name) end
+            clip.file = path
             lib.clips[clip.name] = clip
           end
         end

@@ -59,6 +59,8 @@ A motion is one JSON file. Built-ins live in `clips/`; saved clips go to `<asepr
 
 A clip file that cannot be used (for example: a file that cannot be read or is not valid JSON, no `rig` or a rig that is missing or unreadable, a channel without `keys`, a param without `channels`) is left out of the library, and the rest still load. The dialog names the first skipped file and why on one **Skipped** line under Clip (the Motion tab, or the Motion section on Aseprite builds without tabs), with a count of any others.
 
+Two of your files carrying one clip name load the first by file name, and the other is skipped with that reason.
+
 Skeleton proportions live in `rigs/<name>.json`, normalized to standing height.
 
 ## Layout
