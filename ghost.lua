@@ -269,20 +269,36 @@ return function(Clip, Rig, Render, Colors, Util)
     tag.color = Color { r = rgb[1], g = rgb[2], b = rgb[3] }
   end
 
+  -- The active layer and frame number, with `removed` (a layer about to be deleted) left out.
+  local function site(removed)
+    local layer, frame = app.layer, app.frame
+    if removed and layer == removed then layer = nil end
+    return layer, frame and frame.frameNumber
+  end
+
+  local function restoreSite(layer, frame)
+    if layer then app.layer = layer end
+    if frame then app.frame = frame end
+  end
+
   -- Runs fn as one undo step on sprite, made active for it since NewLayer and app.transaction act
-  -- on the active sprite, then puts the artist back on the sprite, layer and frame they had (#3):
-  -- adding frames moves the active frame. `removed`, a layer fn deletes, is not restored.
+  -- on the active sprite, then puts the artist back where they were (#3): adding frames moves the
+  -- active frame. Both the active sprite's layer and frame and, when another sprite was active,
+  -- sprite's own layer and frame are restored. `removed`, a layer fn deletes, is not restored.
   local function transactionOn(sprite, label, fn, removed)
-    local prevSprite, prevLayer, prevFrame = app.sprite, app.layer, app.frame
-    prevFrame = prevFrame and prevFrame.frameNumber
-    if removed and prevLayer == removed then prevLayer = nil end
-    if prevSprite ~= sprite then app.sprite = sprite end
-    local ok, err = pcall(app.transaction, label, fn)
-    if app.sprite ~= prevSprite then app.sprite = prevSprite end
-    if prevSprite then
-      if prevLayer then app.layer = prevLayer end
-      if prevFrame then app.frame = prevFrame end
+    local prevSprite = app.sprite
+    local prevLayer, prevFrame = site(removed)
+    local ownLayer, ownFrame
+    if prevSprite ~= sprite then
+      app.sprite = sprite
+      ownLayer, ownFrame = site(removed)
     end
+    local ok, err = pcall(app.transaction, label, fn)
+    if app.sprite ~= prevSprite then
+      restoreSite(ownLayer, ownFrame)
+      app.sprite = prevSprite
+    end
+    if prevSprite then restoreSite(prevLayer, prevFrame) end
     if not ok then error(err, 0) end
   end
 

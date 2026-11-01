@@ -308,6 +308,11 @@ do
         "apply with another sprite active writes only the given sprite")
   check(app.sprite == other and app.layer == otherLayer and app.frame.frameNumber == 3,
         "apply with another sprite active keeps it active (" .. where() .. ")")
+  -- The sprite Apply wrote keeps its own layer and frame too, seen on switching back to it.
+  app.sprite = spr
+  check(app.layer == art and app.frame.frameNumber == 1,
+        "apply with another sprite active keeps the written sprite's own layer and frame (" .. where() .. ")")
+  app.sprite = other; app.layer = otherLayer; app.frame = 3
   local tag = spr:newTag(2, 3)
   tag.name = "walk"
   check(Ghost.apply(spr, settings { scope = "walk", frames = 2 }, lib.clips.Run, rig) == nil
@@ -324,6 +329,23 @@ do
   local removed = pcall(Ghost.remove, spr, Ghost.ALL)
   check(removed and Ghost.findLayer(spr, Ghost.ALL) == nil and app.sprite == spr and app.frame.frameNumber == 2,
         "remove with its own ghost layer active keeps the sprite and frame (" .. where() .. ")")
+  spr:close()
+  other:close()
+end
+
+-- Apply with another sprite active is one undo step on the written sprite (#3).
+do
+  local other = Sprite(32, 32, ColorMode.RGB)
+  local spr = Sprite(64, 64, ColorMode.RGB)
+  spr:newEmptyFrame(2); spr:newEmptyFrame(3)
+  app.sprite = other
+  check(Ghost.apply(spr, settings { frames = 5 }, lib.clips.Run, rig) == nil
+        and #spr.frames == 5 and #spr.layers == 2, "apply with another sprite active adds a layer and frames")
+  app.sprite = spr
+  app.command.Undo()
+  check(#spr.frames == 3 and #spr.layers == 1 and #other.layers == 1,
+        "one undo after apply with another sprite active restores the written sprite (" ..
+        #spr.frames .. " frames, " .. #spr.layers .. " layers)")
   spr:close()
   other:close()
 end
