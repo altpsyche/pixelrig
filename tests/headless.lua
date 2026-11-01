@@ -369,32 +369,50 @@ do
     return cel and cel.image
   end
 
-  -- Pixels the ghost draws in RGB, and its color for (part, side), for scheme settings s.
-  local function reference(s)
-    local rgb = Image(48, 48, ColorMode.RGB)
-    rgb:clear()
-    Ghost.renderFrame(rgb, Ghost.build(s, lib.clips.Run, rig), 1, s, Ghost.pixelConverter(ColorMode.RGB))
-    local colorOf = Colors.resolver(s.colorScheme, Colors.resolve(s.colorScheme))
-    return count(rgb, function(v) return app.pixelColor.rgbaA(v) > 0 end), colorOf
+  -- Pixels the ghost draws in RGB for settings s, and how many of them are color rgb.
+  local function reference(s, rgb)
+    local img = Image(48, 48, ColorMode.RGB)
+    img:clear()
+    Ghost.renderFrame(img, Ghost.build(s, lib.clips.Run, rig), 1, s, Ghost.pixelConverter(ColorMode.RGB))
+    local exact = rgb and app.pixelColor.rgba(rgb[1], rgb[2], rgb[3], 255)
+    return count(img, function(v) return app.pixelColor.rgbaA(v) > 0 end), count(img, function(v) return v == exact end)
   end
 
   local function setRgb(pal, i, c) pal:setColor(i, Color { r = c[1], g = c[2], b = c[3], a = 255 }) end
 
-  -- The palette entry at the transparent index is exactly one of the ghost's colors: the near
-  -- color with Near / Far, the auto-darkened far color with Mono, at index 0 and at index 2.
+  local function schemeColor(scheme, part, side)
+    return Colors.resolver(scheme, Colors.resolve(scheme))(part, side)
+  end
+
+  -- The palette entry at the transparent index is exactly one color the ghost draws, so before the
+  -- fix that color's pixels came out transparent. Each path that turns a color into a pixel is
+  -- covered: a scheme's near color, Mono's auto-darkened far color, a custom scheme pick, and the
+  -- motion arc, footprint and ground line colors (Joints + arcs, travel, ground line on).
+  local CUSTOM = { 200, 40, 120 }
+  local extras = { style = "Joints + arcs", travel = true, footprints = true, groundLine = true }
   for _, case in ipairs({
-    { scheme = "Near / Far", transparent = 0, side = "near" },
-    { scheme = "Mono", transparent = 2, side = "far" },
+    { name = "Near / Far near color", transparent = 0, over = { colorScheme = "Near / Far" },
+      rgb = schemeColor("Near / Far", "torso", "near") },
+    { name = "Mono darkened far color", transparent = 2, over = { colorScheme = "Mono" },
+      rgb = schemeColor("Mono", "torso", "far") },
+    { name = "custom scheme color", transparent = 0,
+      over = { colorScheme = "Limbs", schemeColors = { ["Limbs"] = { legNear = CUSTOM } } }, rgb = CUSTOM },
+    { name = "arc color", transparent = 0, over = extras, rgb = Colors.ARC },
+    { name = "footprint color", transparent = 0, over = extras, rgb = Colors.FOOTPRINT },
+    { name = "ground line color", transparent = 3, over = extras, rgb = Colors.GROUND },
   }) do
-    local s = settings { height = 40, groundY = 46, cx = 24, frames = 4, colorScheme = case.scheme }
-    local want, colorOf = reference(s)
+    local over = { height = 40, groundY = 46, cx = 24, frames = 4 }
+    for k, v in pairs(case.over) do over[k] = v end
+    local s = settings(over)
+    local want, ofColor = reference(s, case.rgb)
+    local label = "indexed, " .. case.name .. " at transparent index " .. case.transparent
+    check(ofColor > 0, label .. ": the ghost draws that color (" .. ofColor .. " pixels)")
     local spr = Sprite(48, 48, ColorMode.INDEXED)
     spr.transparentColor = case.transparent
     local pal = spr.palettes[1]
-    setRgb(pal, case.transparent, colorOf("torso", case.side))
+    setRgb(pal, case.transparent, case.rgb)
     local size, before = #pal, {}
     for i = 0, size - 1 do before[i] = pal:getColor(i).rgbaPixel end
-    local label = "indexed, " .. case.scheme .. ", transparent index " .. case.transparent
     check(Ghost.apply(spr, s, lib.clips.Run, rig) == nil, label .. ": apply")
     local drawn = count(ghostImage(spr), function(v) return v ~= case.transparent end)
     check(want > 0 and drawn == want,
