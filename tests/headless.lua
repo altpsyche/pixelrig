@@ -695,5 +695,101 @@ do
   spr:close()
 end
 
+-- Ghost layers are found wherever they are (#6). Every ghost layer in the sprite, groups included.
+local function ghostLayers(spr)
+  local found = {}
+  local function walk(layers)
+    for _, l in ipairs(layers) do
+      if l.isGroup then walk(l.layers) elseif Ghost.isGhost(l) then table.insert(found, l) end
+    end
+  end
+  walk(spr.layers)
+  return found
+end
+
+-- A ghost layer the artist moved into a group: Apply finds it, so no duplicate, and Remove
+-- deletes it, keeping the artist's layer and frame (#3) and adding no frame (ADR-0005).
+do
+  local spr = Sprite(64, 64, ColorMode.RGB)
+  local art = spr.layers[1]
+  local s = settings { frames = 4, height = 40, groundY = 60, cx = 32 }
+  check(Ghost.apply(spr, s, lib.clips.Run, rig) == nil, "grouped: first apply")
+  local ghost = Ghost.findLayer(spr, Ghost.ALL)
+  local group = spr:newGroup()
+  group.name = "Refs"
+  ghost.parent = group
+  check(ghost.parent == group, "grouped: ghost layer moved into a group")
+  check(Ghost.findLayer(spr, Ghost.ALL) == ghost, "grouped: findLayer finds the ghost inside the group")
+  check(Ghost.apply(spr, s, lib.clips.Run, rig) == nil, "grouped: re-apply")
+  local n = #ghostLayers(spr)
+  check(n == 1 and ghost.parent == group, "grouped: re-apply makes no duplicate (" .. n .. " ghost layers)")
+  -- A duplicate the old lookup left behind, at the top level: Remove clears both.
+  local dup = spr:newLayer()
+  dup.data = Ghost.MARK
+  dup.properties("pixelrig").scope = Ghost.ALL
+  local function ghostTags()
+    local n = 0
+    for _, t in ipairs(spr.tags) do if (t.data or ""):find(Ghost.MARK, 1, true) then n = n + 1 end end
+    return n
+  end
+  local tagsBefore = ghostTags()
+  app.sprite = spr; app.layer = art; app.frame = 1
+  Ghost.remove(spr, Ghost.ALL)
+  n = #ghostLayers(spr)
+  check(n == 0 and Ghost.findLayer(spr, Ghost.ALL) == nil, "grouped: remove deletes every ghost of the scope (" .. n .. " left)")
+  check(#group.layers == 0 and #spr.frames == 1 and app.layer == art and app.frame.frameNumber == 1,
+        "grouped: remove leaves the group, the frames and the artist's layer and frame")
+  local tags = ghostTags()
+  check(tags == 0, "grouped: remove clears the ghost's tags (" .. tags .. " left)")
+  -- Removing several layers is still one undo step: one Undo brings back both ghosts and the tags.
+  app.command.Undo()
+  local back = ghostLayers(spr)
+  local grouped, top = 0, 0
+  for _, l in ipairs(back) do
+    if l.parent == group then grouped = grouped + 1 elseif l.parent == spr then top = top + 1 end
+  end
+  tags = ghostTags()
+  check(#back == 2 and grouped == 1 and top == 1 and tags == tagsBefore,
+        string.format("grouped: one undo after remove restores the grouped ghost, the duplicate and %d tags (%d ghosts, %d in group, %d tags)",
+                      tagsBefore, #back, grouped, tags))
+  spr:close()
+end
+
+-- A ghost whose tag was renamed or deleted is still listed, as an orphan, and Remove clears it.
+do
+  local spr = Sprite(64, 64, ColorMode.RGB)
+  for f = 2, 6 do spr:newEmptyFrame(f) end
+  local art = spr.layers[1]
+  local walk = spr:newTag(1, 3); walk.name = "walk"
+  local jump = spr:newTag(4, 6); jump.name = "jump"
+  local s = function(scope) return settings { scope = scope, frames = 3, height = 40, groundY = 60, cx = 32 } end
+  check(Ghost.apply(spr, s("walk"), lib.clips.Run, rig) == nil and Ghost.apply(spr, s("jump"), lib.clips.Run, rig) == nil,
+        "orphans: apply on two tags")
+  walk.name = "stride"
+  spr:deleteTag(jump)
+  local list = Ghost.scopes(spr)
+  check(#list == 4 and list[1] == Ghost.ALL and list[2] == "stride", "orphans: scopes list live tags first (" .. table.concat(list, ", ") .. ")")
+  local wl, jl = Ghost.scopeLabel(spr, "walk"), Ghost.scopeLabel(spr, "jump")
+  check(wl ~= "walk" and wl:find("walk", 1, true) == 1 and jl ~= "jump"
+        and ((list[3] == jl and list[4] == wl) or (list[3] == wl and list[4] == jl)),
+        "orphans: renamed and deleted tags' ghosts are listed (" .. tostring(wl) .. ", " .. tostring(jl) .. ")")
+  check(Ghost.scopeFor(spr, wl) == "walk" and Ghost.scopeFor(spr, "stride") == "stride" and Ghost.scopeFor(spr, Ghost.ALL) == Ghost.ALL,
+        "orphans: a label maps back to its scope")
+  local frames = #spr.frames
+  check(Ghost.apply(spr, s("walk"), lib.clips.Run, rig) ~= nil and #ghostLayers(spr) == 2 and #spr.frames == frames,
+        "orphans: apply on an orphan writes nothing")
+  app.sprite = spr; app.layer = art; app.frame = 5
+  Ghost.remove(spr, "walk")
+  Ghost.remove(spr, "jump")
+  check(app.layer == art and app.frame.frameNumber == 5 and #spr.frames == frames,
+        "orphans: remove keeps the artist's layer and frame and the frames")
+  local rest = Ghost.scopes(spr)
+  check(#ghostLayers(spr) == 0 and #rest == 2, "orphans: remove clears both (" .. table.concat(rest, ", ") .. ")")
+  local tags = {}
+  for _, t in ipairs(spr.tags) do table.insert(tags, t.name) end
+  check(#tags == 1 and tags[1] == "stride", "orphans: only the artist's tag is left (" .. table.concat(tags, ", ") .. ")")
+  spr:close()
+end
+
 print(failures == 0 and "ALL PASSED" or (failures .. " FAILED"))
 if failures > 0 then error(failures .. " test(s) failed") end
