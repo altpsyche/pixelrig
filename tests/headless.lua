@@ -541,15 +541,31 @@ do
   local dup = spr:newLayer()
   dup.data = Ghost.MARK
   dup.properties("pixelrig").scope = Ghost.ALL
+  local function ghostTags()
+    local n = 0
+    for _, t in ipairs(spr.tags) do if (t.data or ""):find(Ghost.MARK, 1, true) then n = n + 1 end end
+    return n
+  end
+  local tagsBefore = ghostTags()
   app.sprite = spr; app.layer = art; app.frame = 1
   Ghost.remove(spr, Ghost.ALL)
   n = #ghostLayers(spr)
   check(n == 0 and Ghost.findLayer(spr, Ghost.ALL) == nil, "grouped: remove deletes every ghost of the scope (" .. n .. " left)")
   check(#group.layers == 0 and #spr.frames == 1 and app.layer == art and app.frame.frameNumber == 1,
         "grouped: remove leaves the group, the frames and the artist's layer and frame")
-  local tags = 0
-  for _, t in ipairs(spr.tags) do if (t.data or ""):find(Ghost.MARK, 1, true) then tags = tags + 1 end end
+  local tags = ghostTags()
   check(tags == 0, "grouped: remove clears the ghost's tags (" .. tags .. " left)")
+  -- Removing several layers is still one undo step: one Undo brings back both ghosts and the tags.
+  app.command.Undo()
+  local back = ghostLayers(spr)
+  local grouped, top = 0, 0
+  for _, l in ipairs(back) do
+    if l.parent == group then grouped = grouped + 1 elseif l.parent == spr then top = top + 1 end
+  end
+  tags = ghostTags()
+  check(#back == 2 and grouped == 1 and top == 1 and tags == tagsBefore,
+        string.format("grouped: one undo after remove restores the grouped ghost, the duplicate and %d tags (%d ghosts, %d in group, %d tags)",
+                      tagsBefore, #back, grouped, tags))
   spr:close()
 end
 
