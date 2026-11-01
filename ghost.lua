@@ -269,14 +269,48 @@ return function(Clip, Rig, Render, Colors, Util)
     tag.color = Color { r = rgb[1], g = rgb[2], b = rgb[3] }
   end
 
-  -- Writes the ghost into the sprite as one undo step. Returns error string or nil.
+  -- The active layer and frame number, with `removed` (a layer about to be deleted) left out.
+  local function site(removed)
+    local layer, frame = app.layer, app.frame
+    if removed and layer == removed then layer = nil end
+    return layer, frame and frame.frameNumber
+  end
+
+  local function restoreSite(layer, frame)
+    if layer then app.layer = layer end
+    if frame then app.frame = frame end
+  end
+
+  -- Runs fn as one undo step on sprite, made active for it since NewLayer and app.transaction act
+  -- on the active sprite, then puts the artist back where they were (#3): adding frames moves the
+  -- active frame. Both the active sprite's layer and frame and, when another sprite was active,
+  -- sprite's own layer and frame are restored. `removed`, a layer fn deletes, is not restored.
+  local function transactionOn(sprite, label, fn, removed)
+    local prevSprite = app.sprite
+    local prevLayer, prevFrame = site(removed)
+    local ownLayer, ownFrame
+    if prevSprite ~= sprite then
+      app.sprite = sprite
+      ownLayer, ownFrame = site(removed)
+    end
+    local ok, err = pcall(app.transaction, label, fn)
+    if app.sprite ~= prevSprite then
+      restoreSite(ownLayer, ownFrame)
+      app.sprite = prevSprite
+    end
+    if prevSprite then restoreSite(prevLayer, prevFrame) end
+    if not ok then error(err, 0) end
+  end
+
+  -- Writes the ghost into the sprite as one undo step, leaving the artist's active sprite, layer
+  -- and frame as they were. Returns error string or nil.
   function Ghost.apply(sprite, s, clip, baseRig)
     local first, last = Ghost.scopeRange(sprite, s.scope)
     if not first then return "Tag '" .. s.scope .. "' not found" end
     local build = Ghost.build(s, clip, baseRig)
     local N = build.N
 
-    app.transaction("Ghost Reference", function()
+    transactionOn(sprite, "Ghost Reference", function()
       local layer = ensureLayer(sprite, s.scope)
       layer.name = "Ghost: " .. clip.name .. (s.scope ~= Ghost.ALL and (" [" .. s.scope .. "]") or "")
       layer.opacity = math.floor(s.opacity * 255 / 100 + 0.5)
@@ -331,11 +365,11 @@ return function(Clip, Rig, Render, Colors, Util)
   end
 
   function Ghost.remove(sprite, scope)
-    app.transaction("Remove Ghost Reference", function()
-      local layer = Ghost.findLayer(sprite, scope)
+    local layer = Ghost.findLayer(sprite, scope)
+    transactionOn(sprite, "Remove Ghost Reference", function()
       if layer then sprite:deleteLayer(layer) end
       clearTags(sprite, scope)
-    end)
+    end, layer)
     app.refresh()
   end
 

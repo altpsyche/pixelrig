@@ -64,9 +64,12 @@ return function(M)
       return pcall(function() return sprite.width end)
     end
 
-    -- Fit to art for this dialog's sprite at the current frame (Ghost.fitToArt), or nil.
+    -- Fit to art for this dialog's sprite (Ghost.fitToArt), or nil. It measures the active frame
+    -- only when that frame is this sprite's; another open sprite may be active (#3).
     local function fitArt()
-      return Ghost.fitToArt(sprite, app.frame and app.frame.frameNumber or 1)
+      local f = app.frame
+      local own = app.sprite == sprite and f
+      return Ghost.fitToArt(sprite, own and f.frameNumber or 1)
     end
 
     local function defaultsFor(scope)
@@ -210,12 +213,19 @@ return function(M)
       dlg:repaint()
     end
 
-    local function applyNow()
-      if not alive() then return end
+    -- Ghost.apply writes this dialog's sprite and leaves the artist's active sprite, layer and
+    -- frame as they were (#3). `clicked`: the artist pressed Apply, the one case that alerts when
+    -- the sprite is closed.
+    local function applyNow(clicked)
+      if not alive() then
+        if clicked then
+          app.alert("The sprite this Ghost Reference was opened for is closed. Reopen the dialog on an open sprite.")
+        end
+        return
+      end
       pull()
       S.clip = work.name
       S.clipData = dirty and Clip.export(work) or nil
-      if app.sprite ~= sprite then app.sprite = sprite end
       local err = Ghost.apply(sprite, S, work, lib.rigs[work.rig])
       if err then app.alert(err) end
       bgCache = {}
@@ -626,7 +636,7 @@ return function(M)
 
     dlg:separator()
     dlg:check { id = "autoApply", text = "Auto-apply to sprite", selected = false }
-    dlg:button { id = "apply", text = "Apply", focus = true, onclick = applyNow }
+    dlg:button { id = "apply", text = "Apply", focus = true, onclick = function() applyNow(true) end }
     dlg:button { id = "remove", text = "Remove", onclick = function()
       if alive() then Ghost.remove(sprite, S.scope) end
     end }

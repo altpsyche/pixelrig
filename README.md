@@ -19,7 +19,7 @@ Tested on a current Aseprite source build (Lua API version 41) and on Aseprite v
 
 ## Ghost Reference
 
-View → Ghost Reference... opens a dialog with an animated preview over your art. Nothing touches the sprite until **Apply**, which writes one undo step: a reference layer (never exported) with one ghost pose per frame.
+View → Ghost Reference... opens a dialog with an animated preview over your art. Nothing touches the sprite until **Apply**, which writes one undo step: a reference layer (never exported) with one ghost pose per frame. Apply and Remove leave your active sprite, layer and frame where they were, even when another sprite is active.
 
 **Preview.** Play, scrub, step frames. Your art is drawn under the ghost so you can line them up.
 
@@ -31,7 +31,7 @@ View → Ghost Reference... opens a dialog with an animated preview over your ar
 
 **Body tab.** Presets (Default, Heroic, Chibi, Stocky) or custom head / torso / arms / legs / bulk. Facing.
 
-**Place tab.** Fit to art: uses the selection, else all visible art layers together (ghost and reference layers left out), whichever layer is active. Height, ground line, center X. A new ghost auto-fits on first open.
+**Place tab.** Fit to art: uses the selection, else all visible art layers together (ghost and reference layers left out), whichever layer is active. It measures the dialog's own sprite only, at the active frame when that sprite is active, else at frame 1. Height, ground line, center X. A new ghost auto-fits on first open.
 
 **Look tab.** Stick, Capsule, Joints + arcs. Line width, pixel-perfect 1px lines, opacity. Under **Colors**, color schemes, each with its own pickers (picks are kept per scheme; Reset colors restores defaults):
 

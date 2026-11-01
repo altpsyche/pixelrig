@@ -273,6 +273,32 @@ check(layer ~= nil, "apply creates ghost layer")
 local saved = M.Ghost.loadSettings(layer)
 check(saved and saved.clipData ~= nil and saved.style == "Joints + arcs", "edited clip + settings saved on layer")
 
+-- Another sprite active, its own layer and frame 3 (#3): Fit measures only the dialog's sprite,
+-- and Apply writes the dialog's sprite without leaving the artist on it.
+local other = Sprite(32, 32, ColorMode.RGB)
+other:newEmptyFrame(2); other:newEmptyFrame(3)
+local otherLayer = other.layers[1]
+local otherImg = Image(32, 32, ColorMode.RGB)
+for y = 2, 31 do for x = 0, 31 do otherImg:drawPixel(x, y, app.pixelColor.rgba(20, 200, 20, 255)) end end
+other:newCel(otherLayer, 3, otherImg, Point(0, 0))
+app.sprite = other; app.layer = otherLayer; app.frame = 3
+local function otherActive()
+  return app.sprite == other and app.layer == otherLayer and app.frame and app.frame.frameNumber == 3
+end
+set("height", 48)
+click("fit")
+check(widgets.height.value == 40 and widgets.groundY.value == 59 and widgets.cx.value == 32 and otherActive(),
+      "fit with another sprite's layer and frame active measures the dialog's sprite (" ..
+      widgets.height.value .. "px, ground " .. widgets.groundY.value .. ", cx " .. widgets.cx.value .. ")")
+local framesBefore = #spr.frames
+click("apply")
+local applied = M.Ghost.loadSettings(M.Ghost.findLayer(spr, M.Ghost.ALL))
+check(applied and applied.height == 40 and #other.layers == 1 and #other.frames == 3 and #spr.frames == framesBefore,
+      "apply with another sprite active writes the dialog's sprite only")
+check(otherActive(), "apply with another sprite active leaves that sprite, layer and frame active")
+app.sprite = spr
+other:close()
+
 -- save clip
 set("clipName", "Run test")
 click("saveClip")
@@ -360,6 +386,27 @@ end
 click("remove")
 check(M.Ghost.findLayer(spr, M.Ghost.ALL) == nil, "remove ghost")
 click("close")
+
+-- The dialog's sprite closed (#3): Apply says so, auto-apply stays silent.
+do
+  for k in pairs(widgets) do widgets[k] = nil end
+  local gone = Sprite(32, 32, ColorMode.RGB)
+  app.sprite = gone
+  M.UI.open()
+  gone:close()
+  app.sprite = spr
+  local alerts = {}
+  rawset(app, "alert", function(t) table.insert(alerts, type(t) == "table" and t.text or t) end)
+  set("autoApply", true)
+  set("ease", "Ease in")
+  local autoAlerts = #alerts
+  click("apply")
+  rawset(app, "alert", nil)
+  check(autoAlerts == 0, "auto-apply on a closed sprite stays silent (" .. autoAlerts .. " alerts)")
+  check(#alerts == 1 and tostring(alerts[1]):find("is closed", 1, true) ~= nil,
+        "apply on a closed sprite says so: " .. tostring(alerts[1]))
+  click("close")
+end
 
 print((NOTABS and "[no tabs] " or "[tabs] ") .. (failures == 0 and "ALL PASSED" or (failures .. " FAILED")))
 if failures > 0 then error(failures .. " test(s) failed") end
