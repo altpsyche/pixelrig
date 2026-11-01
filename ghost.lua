@@ -183,11 +183,14 @@ return function(Clip, Rig, Render, Colors, Util)
 
   -- Rendering -------------------------------------------------------------------
 
-  local function nearestIndex(palette, r, g, b)
-    local best, bestD = 0, math.huge
+  -- Nearest visible palette entry: never the transparent index, which would hide the ghost (#5),
+  -- and never a fully transparent entry. The palette is the artist's and is not changed. Returns
+  -- false when the palette has no such entry; nothing is drawn then.
+  local function nearestIndex(palette, transparent, r, g, b)
+    local best, bestD = false, math.huge
     for i = 0, #palette - 1 do
       local c = palette:getColor(i)
-      if c.alpha > 0 then
+      if i ~= transparent and c.alpha > 0 then
         local dr, dg, db = c.red - r, c.green - g, c.blue - b
         local d = dr * dr + dg * dg + db * db
         if d < bestD then best, bestD = i, d end
@@ -196,19 +199,34 @@ return function(Clip, Rig, Render, Colors, Util)
     return best
   end
 
-  -- Returns function({r,g,b}) -> pixel value for the color mode, cached.
-  function Ghost.pixelConverter(colorMode, palette)
+  Ghost.NO_VISIBLE_COLOR = "This sprite's palette has no visible color besides the transparent one, "
+    .. "so there is nothing to draw the ghost with. Add a color to the palette."
+
+  -- A one-line note when sprite cannot show a ghost at all: an indexed palette whose only visible
+  -- entry, if any, is the transparent index. Nil when the ghost can be drawn.
+  function Ghost.cannotDraw(sprite)
+    if sprite.colorMode ~= ColorMode.INDEXED then return nil end
+    local palette, transparent = sprite.palettes[1], sprite.transparentColor
+    for i = 0, #palette - 1 do
+      if i ~= transparent and palette:getColor(i).alpha > 0 then return nil end
+    end
+    return Ghost.NO_VISIBLE_COLOR
+  end
+
+  -- Returns function({r,g,b}) -> pixel value for the color mode, cached. Indexed mode takes the
+  -- sprite's palette and transparent index; it returns false for a color it cannot draw.
+  function Ghost.pixelConverter(colorMode, palette, transparent)
     local cache = {}
     return function(c)
       local key = c[1] * 65536 + c[2] * 256 + c[3]
       local v = cache[key]
-      if v then return v end
+      if v ~= nil then return v end
       if colorMode == ColorMode.RGB then
         v = app.pixelColor.rgba(c[1], c[2], c[3], 255)
       elseif colorMode == ColorMode.GRAY then
         v = app.pixelColor.graya(math.floor(0.299 * c[1] + 0.587 * c[2] + 0.114 * c[3]), 255)
       else
-        v = nearestIndex(palette, c[1], c[2], c[3])
+        v = nearestIndex(palette, transparent, c[1], c[2], c[3])
       end
       cache[key] = v
       return v
@@ -221,7 +239,7 @@ return function(Clip, Rig, Render, Colors, Util)
     local resolve = Colors.resolver(s.colorScheme, Colors.resolve(s.colorScheme, picks))
     local W, Hh = img.width, img.height
     local put = function(x, y, c)
-      if x >= 0 and y >= 0 and x < W and y < Hh then img:drawPixel(x, y, c) end
+      if c and x >= 0 and y >= 0 and x < W and y < Hh then img:drawPixel(x, y, c) end
     end
     local trails = {}
     for _, pts in pairs(build.trails) do
@@ -307,6 +325,8 @@ return function(Clip, Rig, Render, Colors, Util)
   function Ghost.apply(sprite, s, clip, baseRig)
     local first, last = Ghost.scopeRange(sprite, s.scope)
     if not first then return "Tag '" .. s.scope .. "' not found" end
+    local note = Ghost.cannotDraw(sprite)
+    if note then return note end
     local build = Ghost.build(s, clip, baseRig)
     local N = build.N
 
@@ -323,7 +343,7 @@ return function(Clip, Rig, Render, Colors, Util)
         for fr = first, math.min(last, first + N - 1) do sprite.frames[fr].duration = 1 / s.fps end
       end
 
-      local toPixel = Ghost.pixelConverter(sprite.colorMode, sprite.palettes[1])
+      local toPixel = Ghost.pixelConverter(sprite.colorMode, sprite.palettes[1], sprite.transparentColor)
       local images = {}
       for i = 1, N do
         local img = Image(sprite.spec)
