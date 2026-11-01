@@ -22,15 +22,19 @@ if command -v node >/dev/null; then
     }' clips/*.json rigs/*.json
 fi
 
-# Release archive: package.json at its root, only the extension inside.
+# Release archive: package.json at its root, only the extension inside (tools/check-archive.sh).
 if command -v zip >/dev/null && command -v unzip >/dev/null; then
   archive="$(tools/package.sh | grep '\.zip$')"
-  listing="$(unzip -Z1 "$archive")"
-  grep -qx 'package.json' <<<"$listing" || { echo "verify: $archive has no package.json at its root" >&2; exit 1; }
-  if grep -E '^(tests|tools|scripts|docs|evals|\.agents|\.github)/' <<<"$listing"; then
-    echo "verify: $archive ships files that are not the extension (above)" >&2
+  tools/check-archive.sh "$archive"
+  # Self-test: the guard refuses an archive carrying a file outside the extension.
+  bad="$(mktemp -d)/bad.zip"
+  cp "$archive" "$bad"
+  zip -q "$bad" AGENTS.md
+  if tools/check-archive.sh "$bad" 2>/dev/null; then
+    echo "verify: tools/check-archive.sh accepted an archive with AGENTS.md in it" >&2
     exit 1
   fi
+  rm -rf "$(dirname "$bad")"
 else
   echo "verify: zip/unzip not found, package check skipped (CI runs it)" >&2
 fi

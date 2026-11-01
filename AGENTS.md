@@ -55,9 +55,10 @@ queries), tests itself, the pre-push hook, `bootstrap.sh`'s ruleset step against
 eval case parser over every case in `evals/`, the eval runner and cleanup scripts against a stub
 `gh`, and the Jev tools in [`scripts/jev/`](scripts/jev/README.md), the latter against a fake
 server, and scans every commit for secrets with gitleaks. Project checks: every `.lua` file
-compiles (`luac -p`), every clip and rig JSON parses, `tools/package.sh` builds an archive with
-`package.json` at its root, and, when an Aseprite binary is found (`$ASEPRITE`, or `aseprite` on
-`PATH`), `tests/headless.lua` and `tests/ui_mock.lua` run in batch mode. CI has no Aseprite, so
+compiles (`luac -p`), every clip and rig JSON parses, the archive `tools/package.sh` builds
+holds only the extension with `package.json` at its root (`tools/check-archive.sh`, with a
+self-test), and, when an Aseprite binary is found (`$ASEPRITE`, or `aseprite` on `PATH`),
+`tests/headless.lua` and `tests/ui_mock.lua` run in batch mode. CI has no Aseprite, so
 it skips those two and says so; run them locally before a PR that touches Lua. Update this block and
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) in the same commit that changes the checks.
 An Implementer also runs it before changing anything, per [`docs/workflow.md`](docs/workflow.md)

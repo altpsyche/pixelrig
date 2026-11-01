@@ -8,6 +8,7 @@ cd "$root"
 version="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' package.json | head -1)"
 [ -n "$version" ] || { echo "version not found in package.json" >&2; exit 1; }
 
+# What ships. tools/check-archive.sh holds the matching allowlist; change both together.
 files=(package.json LICENSE README.md *.lua clips rigs)
 name="pixelrig-v$version"
 mkdir -p dist
