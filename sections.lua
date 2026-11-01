@@ -2,7 +2,9 @@
 -- Uses Dialog:tab / Dialog:endtabs where the Aseprite build has them: each tab holds its parts,
 -- parts after the first shown under a separator. Older builds (v1.3-rc6, Lua API 25) have
 -- neither, and reading the field raises "Field tab does not exist"; there a "Section" picker
--- shows one part at a time, which keeps the dialog short enough for the screen.
+-- shows one part at a time, which keeps the dialog short enough for the screen. Each widget gets
+-- its visibility when created (v1.3-rc6 reads `visible` for every widget it adds through
+-- Dialog_add_widget); the helper never creates separators in picker mode, which would not.
 --
 --   local sec = Sections.new(dlg, {
 --     { id = "tabMotion", text = "Motion", parts = { { id = "secMotion", text = "Motion" },
@@ -92,12 +94,7 @@ end
 
 function Sections:finish()
   self.current = nil
-  if self.hasTabs then
-    self.dlg:endtabs { id = "tabs", selected = self.tabs[1].id }
-  else
-    -- Not every widget reads `visible` when created (v1.3-rc6 separators do not); modify does.
-    self:show(self.shown)
-  end
+  if self.hasTabs then self.dlg:endtabs { id = "tabs", selected = self.tabs[1].id } end
 end
 
 -- A widget's own visibility; in picker mode it also needs its part to be shown.
