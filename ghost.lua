@@ -328,8 +328,16 @@ return function(Clip, Rig, Render, Colors, Util)
       layer.name = "Ghost: " .. clip.name .. (s.scope ~= Ghost.ALL and (" [" .. s.scope .. "]") or "")
       layer.opacity = math.floor(s.opacity * 255 / 100 + 0.5)
 
-      for _ = 1, add do sprite:newEmptyFrame(#sprite.frames + 1) end
-      last = last + add
+      if add > 0 then
+        -- newEmptyFrame grows a tag that ends on the last frame; the artist's tags keep their range.
+        local ends = {}
+        for _, tag in ipairs(sprite.tags) do table.insert(ends, { tag, tag.toFrame.frameNumber }) end
+        for _ = 1, add do sprite:newEmptyFrame(#sprite.frames + 1) end
+        for _, e in ipairs(ends) do
+          if e[1].toFrame.frameNumber ~= e[2] then e[1].toFrame = e[2] end
+        end
+        last = last + add
+      end
       if s.timing then
         for fr = first, math.min(last, first + N - 1) do sprite.frames[fr].duration = 1 / s.fps end
       end

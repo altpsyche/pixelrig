@@ -372,6 +372,9 @@ do
   end
   check(inRange, "add frames off: label tags stay inside the sprite's frames")
 
+  -- An artist's tag ending on the last frame: Aseprite's newEmptyFrame would grow it.
+  local outro = spr:newTag(7, 8)
+  outro.name = "outro"
   s.addFrames = true
   fit, cycle, add = Ghost.cycleFit(spr, s)
   check(fit == 12 and cycle == 12 and add == 4, string.format("add frames on: %s of %s fit after adding %s",
@@ -381,6 +384,9 @@ do
   check(Ghost.apply(spr, s, lib.clips.Run, rig) == nil and #spr.frames == 12,
         "add frames on: apply adds frames to 12 (" .. #spr.frames .. " frames)")
   check(Ghost.loadSettings(layer).addFrames == true, "add frames on: the option is saved with the ghost")
+  check(outro.fromFrame.frameNumber == 7 and outro.toFrame.frameNumber == 8,
+        "add frames on: an artist's tag ending on the last frame keeps its range (" ..
+        outro.fromFrame.frameNumber .. ".." .. outro.toFrame.frameNumber .. ")")
   app.command.Undo()
   check(#spr.frames == 8 and Ghost.loadSettings(Ghost.findLayer(spr, Ghost.ALL)).addFrames == false,
         "add frames on: one undo removes the added frames with that apply (" .. #spr.frames .. " frames)")
