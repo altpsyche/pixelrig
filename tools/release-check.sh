@@ -31,8 +31,8 @@ notes="docs/releases/$tag.md"
 [ -f "$notes" ] || fail "$notes is missing; write the release notes for $tag there"
 heading="# PixelRig $tag"
 [ "$(head -n 1 "$notes")" = "$heading" ] || fail "$notes: first line must be \"$heading\""
-# The body, from the first non-blank line after the heading.
-body="$(tail -n +2 "$notes" | sed '/./,$!d')"
+# The body, from the first line after the heading that holds more than whitespace.
+body="$(tail -n +2 "$notes" | sed '/[^[:space:]]/,$!d')"
 [ -n "$body" ] || fail "$notes has a heading and no notes"
 # Every vX.Y.Z in the body must be the tag itself, as in notes copied forward from the last
 # release. A token is the tag when it is the tag followed by nothing that would lengthen the

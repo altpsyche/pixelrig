@@ -66,6 +66,17 @@ test('a tag with no notes file fails and names the file', () =>
     assert.equal(run.stdout, '');
   }));
 
+test('notes with a heading and only blank or whitespace lines fail', async () => {
+  for (const notes of ['# PixelRig v0.2.0\n', '# PixelRig v0.2.0\n\n', '# PixelRig v0.2.0\n   \n\t\n']) {
+    await withRepo({ notes }, async (check) => {
+      const run = check('v0.2.0', 'main');
+      assert.equal(run.status, 1, `${JSON.stringify(notes)} was accepted`);
+      assert.match(run.stderr, /docs\/releases\/v0\.2\.0\.md has a heading and no notes/);
+      assert.equal(run.stdout, '');
+    });
+  }
+});
+
 test('notes whose heading names another version fail', () =>
   withRepo({ notes: NOTES.replace('# PixelRig v0.2.0', '# PixelRig v0.1.0') }, async (check) => {
     const run = check('v0.2.0', 'main');
