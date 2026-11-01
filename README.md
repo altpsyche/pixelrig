@@ -74,7 +74,7 @@ Skeleton proportions live in `rigs/<name>.json`, normalized to standing height.
 | `modules.lua` | Module loader, clip library (built-in + user) |
 | `ui.lua` | Dialog: preview canvas, transport, sections, pose dragging |
 | `sections.lua` | Dialog sections: tabs where Aseprite has them, a section picker on older builds (v1.3-rc6) |
-| `ghost.lua` | Build frames, travel/foot lock, render, apply, scopes, persistence, fit, preview composite |
+| `ghost.lua` | Build frames, travel/foot lock, render, apply, scopes, persistence, fit, preview composite (Aseprite's renderer) |
 | `clip.lua` | Clip sampling, param mods, key pose easing, key editing |
 | `rig.lua` | Side-view FK, ground solve, proportion presets |
 | `render.lua` | Rasterizer: chains, pixel-perfect, capsules, styles, footprints |
@@ -95,6 +95,7 @@ scripts/install-hooks.sh                       # once per clone: pre-push runs v
 ASEPRITE=/path/to/aseprite scripts/verify.sh   # everything CI runs, plus the Aseprite tests
 tools/dev-install.sh               # link checkout into ~/.config/aseprite/extensions/pixelrig
 tools/test.sh /path/to/aseprite    # every Aseprite suite, then fails if any did; sheets in tests/out/
+aseprite -b --script-param root=$PWD --script tests/bench_preview.lua  # preview timings, 1024x1024 (#8)
 tools/package.sh                   # build dist/*.aseprite-extension and dist/*.zip
 ```
 

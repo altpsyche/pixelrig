@@ -546,44 +546,19 @@ return function(Clip, Rig, Render, Colors, Util)
 
   -- Preview background --------------------------------------------------------
 
-  -- RGB composite of visible art (no ghosts, no reference layers) at a frame.
+  -- RGB composite of visible art (no ghosts, no reference layers) at a frame, drawn by Aseprite's
+  -- own renderer in C++, for every color mode: a per-pixel Lua loop took about a second per frame
+  -- on a 1024x1024 indexed sprite (#8). The renderer skips hidden and reference layers, and a
+  -- ghost layer is always a reference layer (ensureLayer; Lua cannot unset the flag), so the art
+  -- is what it was. It blends as the canvas does: layer blend modes on every color mode, layer and
+  -- cel opacity on indexed and gray sprites too, and group opacity when the experimental Compose
+  -- groups preference is on, which the canvas reads as well. The old composite drew every layer
+  -- in Normal mode, and indexed and gray pixels opaque.
   function Ghost.composite(sprite, frameNumber)
     local img = Image(sprite.width, sprite.height, ColorMode.RGB)
     img:clear()
     if frameNumber < 1 or frameNumber > #sprite.frames then return img end
-    local rgb = sprite.colorMode == ColorMode.RGB
-    local pal = sprite.palettes[1]
-    local transparent = sprite.transparentColor
-    for _, l in ipairs(artLayers(sprite)) do
-      local cel = l:cel(frameNumber)
-      if cel then
-        local opacity = (l.opacity or 255) * cel.opacity // 255
-        if rgb then
-          img:drawImage(cel.image, cel.position, opacity)
-        else
-          local src = cel.image
-          local px, py = cel.position.x, cel.position.y
-          for it in src:pixels() do
-            local v = it()
-            local c
-            if sprite.colorMode == ColorMode.GRAY then
-              local a = app.pixelColor.grayaA(v)
-              if a > 0 then
-                local g = app.pixelColor.grayaV(v)
-                c = app.pixelColor.rgba(g, g, g, a)
-              end
-            elseif v ~= transparent or l.isBackground then
-              local col = pal:getColor(v)
-              if col.alpha > 0 then c = app.pixelColor.rgba(col.red, col.green, col.blue, col.alpha) end
-            end
-            if c then
-              local x, y = px + it.x, py + it.y
-              if x >= 0 and y >= 0 and x < img.width and y < img.height then img:drawPixel(x, y, c) end
-            end
-          end
-        end
-      end
-    end
+    img:drawSprite(sprite, frameNumber)
     return img
   end
 

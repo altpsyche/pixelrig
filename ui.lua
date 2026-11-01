@@ -29,11 +29,22 @@ return function(M)
     return text
   end
 
+  -- Seconds between preview frames at fps.
+  local function playInterval(fps) return 1 / max(1, fps) end
+
   local function nearAngle(v, old)
     if not old then return v end
     while v - old > 180 do v = v - 360 end
     while v - old < -180 do v = v + 360 end
     return v
+  end
+
+  -- Calls fn on every change to sprite (an edit, undo or redo). Returns a function that stops it,
+  -- or nil where this Aseprite has no sprite events; tests replace it to take that path.
+  function UI.watchSprite(sprite, fn)
+    local ok, key = pcall(function() return sprite.events:on("change", fn) end)
+    if not ok then return nil end
+    return function() pcall(function() sprite.events:off(key) end) end
   end
 
   function UI.open()
@@ -53,7 +64,9 @@ return function(M)
     -- State ------------------------------------------------------------------
     local dlg, S, work, build
     local dirty = false
+    -- Ghost preview frames and art composites by frame, each made when first painted (#8).
     local ghostImgs, bgCache = {}, {}
+    local ghostPixel = Ghost.pixelConverter(ColorMode.RGB)
     local cur, playing, drag = 1, false, nil
     local view = { x = 0, y = 0, z = 1 }
     local playTimer, changeTimer, applyTimer
@@ -180,6 +193,17 @@ return function(M)
       return bgCache[fr]
     end
 
+    -- Preview image of ghost frame i, rendered the first time it is painted after a rebuild.
+    local function ghostFor(i)
+      if not ghostImgs[i] and build.frames[i] then
+        local img = Image(sprite.width, sprite.height, ColorMode.RGB)
+        img:clear()
+        Ghost.renderFrame(img, build, i, S, ghostPixel)
+        ghostImgs[i] = img
+      end
+      return ghostImgs[i]
+    end
+
     local function markLabel()
       local N = build.N
       local i, j = Clip.segmentAt(work, (cur - 1) / N)
@@ -212,19 +236,15 @@ return function(M)
       dlg:modify { id = "addFrames", text = text, enabled = S.scope == Ghost.ALL }
     end
 
-    local function rebuild()
+    -- Rebuilds the ghost; each frame renders when painted. `keepArt`: a pose edit (a joint drag,
+    -- spacing, revert) leaves the art as it was, so its composites are kept. A settings change
+    -- drops them, so art the artist changed since shows; the painted frame is composited again.
+    local function rebuild(keepArt)
       if not alive() then return end
       refreshFit()
       build = Ghost.build(S, work, lib.rigs[work.rig])
       ghostImgs = {}
-      bgCache = {}
-      local toPixel = Ghost.pixelConverter(ColorMode.RGB)
-      for i = 1, build.N do
-        local img = Image(sprite.width, sprite.height, ColorMode.RGB)
-        img:clear()
-        Ghost.renderFrame(img, build, i, S, toPixel)
-        ghostImgs[i] = img
-      end
+      if not keepArt then bgCache = {} end
       if cur > build.N then cur = 1 end
       dlg:modify { id = "frame", min = 1, max = build.N, value = cur }
       updatePoseUI()
@@ -254,6 +274,8 @@ return function(M)
       S.clipData = dirty and Clip.export(work) or nil
       local err = Ghost.apply(sprite, S, work, lib.rigs[work.rig])
       if err then app.alert(err) end
+      -- Apply changed the sprite, so composite the art again. artChanged does it too, but only
+      -- where this Aseprite has sprite events (UI.watchSprite).
       bgCache = {}
       refreshFit()
     end
@@ -268,6 +290,17 @@ return function(M)
       dlg:modify { id = "frame", value = cur }
       updatePoseUI()
       dlg:repaint()
+    end
+
+    -- While playing, a new FPS sets the play speed at once (#8); restarting counts the new
+    -- interval from now.
+    local function onFps()
+      if playing then
+        playTimer:stop()
+        playTimer.interval = playInterval(dlg.data.fps)
+        playTimer:start()
+      end
+      changed()
     end
 
     local function stopPlay()
@@ -308,7 +341,7 @@ return function(M)
       val = nearAngle(val, old)
       if Clip.setPoseKey(work, ch, fr.tw, side, val, build.N, S.params[work.name]) then
         dirty = true
-        rebuild()
+        rebuild(true)
       end
     end
 
@@ -334,7 +367,7 @@ return function(M)
         local bg = bgFor(cur)
         if bg then gc:drawImage(bg, bg.bounds, dst) end
       end
-      local g = ghostImgs[cur]
+      local g = ghostFor(cur)
       if g then
         gc.opacity = max(60, floor(S.opacity * 255 / 100))
         gc:drawImage(g, g.bounds, dst)
@@ -566,7 +599,7 @@ return function(M)
     local function onRevert()
       work = Clip.clone(lib.clips[S.clip] or lib.clips[lib.names[1]])
       S.clipData, dirty = nil, false
-      rebuild()
+      rebuild(true)
     end
 
     -- Dialog -----------------------------------------------------------------
@@ -581,13 +614,23 @@ return function(M)
       end
     end }
     applyTimer = Timer { interval = 0.4, ontick = function() applyTimer:stop(); applyNow() end }
-    playTimer = Timer { interval = 1 / max(1, S.fps), ontick = function()
+    playTimer = Timer { interval = playInterval(S.fps), ontick = function()
       if not build then return end
       setFrame(cur % build.N + 1)
     end }
 
+    -- Art the artist edits while the dialog is open shows in the preview at once: any change to the
+    -- sprite (an edit, undo or redo) drops the art composites, and the painted frame is composited
+    -- again (#8). Pose edits do not change the sprite, so a joint drag keeps them.
+    local function artChanged()
+      bgCache = {}
+      if dlg then dlg:repaint() end
+    end
+    local unwatch = UI.watchSprite(sprite, artChanged)
+
     dlg = Dialog { title = "PixelRig: Ghost Reference", onclose = function()
       playTimer:stop(); changeTimer:stop(); applyTimer:stop()
+      if unwatch then unwatch() end
     end }
 
     -- Without tabs (v1.3-rc6) every section is a separate page; a shorter preview keeps the
@@ -600,7 +643,7 @@ return function(M)
       playing = not playing
       dlg:modify { id = "play", text = playing and "Pause" or "Play" }
       if playing then
-        playTimer.interval = 1 / max(1, dlg.data.fps)
+        playTimer.interval = playInterval(dlg.data.fps)
         playTimer:start()
       else
         playTimer:stop()
@@ -629,7 +672,7 @@ return function(M)
     W:combobox { id = "scope", label = "Range", option = Ghost.scopeLabel(sprite, S.scope), options = Ghost.scopes(sprite),
                  onchange = onScopeChange }
     W:slider { id = "frames", label = "Frames", min = 2, max = 48, value = S.frames, onchange = changed }
-    W:slider { id = "fps", label = "FPS", min = 1, max = 60, value = S.fps, onchange = changed }
+    W:slider { id = "fps", label = "FPS", min = 1, max = 60, value = S.fps, onchange = onFps }
     W:check { id = "fillAll", label = "Frames", text = "Loop over range", selected = S.fillAll, onclick = changed }
     W:check { id = "labels", text = "Key pose tags", selected = S.labels, onclick = changed }
     -- Both change the artist's timeline, so both are opt-in and off by default (ADR-0005).
@@ -687,7 +730,7 @@ return function(M)
       if not i then return end
       work.marks[i].ease = dlg.data.ease
       dirty = true
-      rebuild()
+      rebuild(true)
       if dlg.data.autoApply then applyTimer:stop(); applyTimer:start() end
     end }
     W:label { id = "dirtyInfo", text = "" }

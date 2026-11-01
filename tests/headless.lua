@@ -435,6 +435,203 @@ do
   spr:close()
 end
 
+-- The art composite is drawn by Aseprite's renderer (#8). On layers at full opacity in the normal
+-- blend mode it gives the same pixels as the per-cel Lua composite it replaced, kept here as the
+-- reference: RGB, indexed with the transparent index, an indexed background, grayscale, a hidden
+-- layer, a group and an applied ghost.
+do
+  local function oldComposite(sprite, frameNumber)
+    local img = Image(sprite.width, sprite.height, ColorMode.RGB)
+    img:clear()
+    local pal, transparent = sprite.palettes[1], sprite.transparentColor
+    local function walk(layers)
+      for _, l in ipairs(layers) do
+        if not l.isVisible then
+        elseif l.isGroup then walk(l.layers)
+        elseif l.isImage and not Ghost.isGhost(l) and not l.isReference then
+          local cel = l:cel(frameNumber)
+          if cel and sprite.colorMode == ColorMode.RGB then
+            img:drawImage(cel.image, cel.position, (l.opacity or 255) * cel.opacity // 255)
+          elseif cel then
+            for it in cel.image:pixels() do
+              local v, c = it(), nil
+              if sprite.colorMode == ColorMode.GRAY then
+                local a = app.pixelColor.grayaA(v)
+                local g = app.pixelColor.grayaV(v)
+                if a > 0 then c = app.pixelColor.rgba(g, g, g, a) end
+              elseif v ~= transparent or l.isBackground then
+                local col = pal:getColor(v)
+                if col.alpha > 0 then c = app.pixelColor.rgba(col.red, col.green, col.blue, col.alpha) end
+              end
+              local x, y = cel.position.x + it.x, cel.position.y + it.y
+              if c and x >= 0 and y >= 0 and x < img.width and y < img.height then img:drawPixel(x, y, c) end
+            end
+          end
+        end
+      end
+    end
+    walk(sprite.layers)
+    return img
+  end
+  local function differing(a, b)
+    local n = 0
+    for y = 0, a.height - 1 do
+      for x = 0, a.width - 1 do
+        if a:getPixel(x, y) ~= b:getPixel(x, y) then n = n + 1 end
+      end
+    end
+    return n
+  end
+  local function block(spr, layer, v, x, y, w, h)
+    local img = Image(w, h, spr.colorMode)
+    img:clear(v)
+    spr:newCel(layer, 1, img, Point(x, y))
+    return img
+  end
+  local rgba, graya = app.pixelColor.rgba, app.pixelColor.graya
+  local cases = {
+    { "RGB", ColorMode.RGB, function(spr)
+      block(spr, spr.layers[1], rgba(10, 20, 30, 255), 2, 2, 5, 5)
+      block(spr, spr:newLayer(), rgba(200, 0, 0, 128), 4, 4, 6, 6)
+    end },
+    { "indexed with the transparent index", ColorMode.INDEXED, function(spr)
+      block(spr, spr.layers[1], 3, 2, 2, 5, 5)
+      block(spr, spr:newLayer(), 5, 4, 4, 6, 6):drawPixel(1, 1, spr.transparentColor)
+    end },
+    { "indexed background", ColorMode.INDEXED, function(spr)
+      block(spr, spr.layers[1], 3, 0, 0, 16, 16)
+      app.sprite, app.layer = spr, spr.layers[1]
+      app.command.BackgroundFromLayer()
+      spr.layers[1]:cel(1).image:drawPixel(2, 2, spr.transparentColor)
+    end },
+    { "grayscale", ColorMode.GRAY, function(spr)
+      block(spr, spr.layers[1], graya(100, 255), 2, 2, 5, 5)
+      block(spr, spr:newLayer(), graya(200, 255), 4, 4, 6, 6)
+    end },
+    { "hidden layer and group", ColorMode.RGB, function(spr)
+      block(spr, spr.layers[1], rgba(10, 20, 30, 255), 2, 2, 5, 5)
+      local hidden = spr:newLayer()
+      hidden.isVisible = false
+      block(spr, hidden, rgba(200, 0, 0, 255), 4, 4, 6, 6)
+      local group = spr:newGroup()
+      local inner = spr:newLayer()
+      inner.parent = group
+      block(spr, inner, rgba(0, 200, 0, 255), 8, 1, 3, 3)
+    end },
+    { "indexed with a ghost applied", ColorMode.INDEXED, function(spr)
+      block(spr, spr.layers[1], 3, 2, 2, 5, 5)
+      Ghost.apply(spr, settings { height = 12, groundY = 15, cx = 8 }, lib.clips.Run, rig)
+    end },
+  }
+  for _, case in ipairs(cases) do
+    local spr = Sprite(16, 16, case[2])
+    case[3](spr)
+    local n = differing(Ghost.composite(spr, 1), oldComposite(spr, 1))
+    check(n == 0, "composite of " .. case[1] .. " matches the per-cel composite (" .. n .. " pixels differ)")
+    spr:close()
+  end
+end
+
+-- The composite shows what the canvas shows (#8 review). Layer opacity and blend modes apply, on
+-- RGB as on indexed sprites; the per-cel composite ignored blend modes and indexed opacity. Group
+-- opacity applies only with the experimental Compose groups preference on, as on the canvas,
+-- which reads the same preference. Each RGB case equals a flattened copy of the sprite, and one
+-- pixel is checked by hand: red over blue at half opacity, a Multiply layer, a group at half
+-- opacity, and an indexed layer at half.
+do
+  local rgba = app.pixelColor.rgba
+  local function block(spr, layer, v, x, y, w, h)
+    local img = Image(w, h, spr.colorMode)
+    img:clear(v)
+    spr:newCel(layer, 1, img, Point(x, y))
+  end
+  -- The sprite as Aseprite flattens it, drawn into an RGB image the size of the sprite.
+  local function flattened(spr)
+    local copy = Sprite(spr)
+    app.sprite = copy
+    app.command.FlattenLayers { visibleOnly = true }
+    local img = Image(copy.width, copy.height, ColorMode.RGB)
+    img:clear()
+    local cel = copy.layers[1]:cel(1)
+    if cel then img:drawImage(cel.image, cel.position) end
+    copy:close()
+    return img
+  end
+  local function near(px, r, g, b)
+    local pc = app.pixelColor
+    return math.abs(pc.rgbaR(px) - r) <= 1 and math.abs(pc.rgbaG(px) - g) <= 1
+      and math.abs(pc.rgbaB(px) - b) <= 1 and pc.rgbaA(px) == 255
+  end
+  local function rgbOf(px)
+    local pc = app.pixelColor
+    return string.format("%d,%d,%d,%d", pc.rgbaR(px), pc.rgbaG(px), pc.rgbaB(px), pc.rgbaA(px))
+  end
+  local cases = {
+    { "a layer at half opacity", { 128, 0, 127 }, function(spr)
+      block(spr, spr.layers[1], rgba(0, 0, 255, 255), 0, 0, 16, 16)
+      local top = spr:newLayer()
+      top.opacity = 128
+      block(spr, top, rgba(255, 0, 0, 255), 4, 4, 6, 6)
+    end },
+    { "a Multiply layer", { 100, 50, 25 }, function(spr)
+      block(spr, spr.layers[1], rgba(128, 128, 128, 255), 0, 0, 16, 16)
+      local top = spr:newLayer()
+      top.blendMode = BlendMode.MULTIPLY
+      block(spr, top, rgba(200, 100, 50, 255), 4, 4, 6, 6)
+    end },
+    { "a group at half opacity, Compose groups off", { 255, 0, 0 }, function(spr)
+      block(spr, spr.layers[1], rgba(0, 0, 255, 255), 0, 0, 16, 16)
+      local group = spr:newGroup()
+      group.opacity = 128
+      local inner = spr:newLayer()
+      inner.parent = group
+      block(spr, inner, rgba(255, 0, 0, 255), 4, 4, 6, 6)
+    end },
+  }
+  for _, case in ipairs(cases) do
+    local spr = Sprite(16, 16, ColorMode.RGB)
+    case[3](spr)
+    local comp = Ghost.composite(spr, 1)
+    local e = case[2]
+    local n = 0
+    local flat = flattened(spr)
+    for y = 0, 15 do for x = 0, 15 do
+      if comp:getPixel(x, y) ~= flat:getPixel(x, y) then n = n + 1 end
+    end end
+    check(n == 0 and near(comp:getPixel(5, 5), e[1], e[2], e[3]),
+          string.format("composite of %s matches the flattened sprite (%d pixels differ, %s)",
+                        case[1], n, rgbOf(comp:getPixel(5, 5))))
+    spr:close()
+  end
+  -- Compose groups on: the group's opacity applies. Flatten ignores the preference, so by hand.
+  do
+    local pref = app.preferences.experimental
+    local was = pref.compose_groups
+    pref.compose_groups = true
+    local spr = Sprite(16, 16, ColorMode.RGB)
+    cases[3][3](spr)
+    local px = Ghost.composite(spr, 1):getPixel(5, 5)
+    pref.compose_groups = was
+    check(near(px, 128, 0, 127), "composite of a group at half opacity, Compose groups on, blends it ("
+          .. rgbOf(px) .. ")")
+    spr:close()
+  end
+  -- Indexed: a flattened copy would be indexed again, so the pixel is checked by hand.
+  local spr = Sprite(16, 16, ColorMode.INDEXED)
+  local pal = Palette(3)
+  pal:setColor(0, Color { r = 0, g = 0, b = 0, a = 0 })
+  pal:setColor(1, Color { r = 0, g = 0, b = 255 })
+  pal:setColor(2, Color { r = 255, g = 0, b = 0 })
+  spr:setPalette(pal)
+  block(spr, spr.layers[1], 1, 0, 0, 16, 16)
+  local top = spr:newLayer()
+  top.opacity = 128
+  block(spr, top, 2, 4, 4, 6, 6)
+  local px = Ghost.composite(spr, 1):getPixel(5, 5)
+  check(near(px, 128, 0, 127), "composite of an indexed layer at half opacity blends it (" .. rgbOf(px) .. ")")
+  spr:close()
+end
+
 -- Fit measures all visible art, not the active layer (#42): a body layer and a small boots
 -- layer, boots active, fit to the whole body; a non-empty selection still wins.
 do

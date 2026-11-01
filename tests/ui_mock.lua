@@ -84,9 +84,12 @@ setmetatable(mock, { __index = function(_, k)
 end })
 
 Dialog = function(t) mock._onclose = t.onclose; return mock end
+local timers = {}
 Timer = function(t)
-  return { interval = t.interval, running = false, ontick = t.ontick,
-           start = function(self) self.running = true; self.ontick() end, stop = function(self) self.running = false end }
+  local timer = { interval = t.interval, running = false, ontick = t.ontick,
+                  start = function(self) self.running = true; self.ontick() end, stop = function(self) self.running = false end }
+  table.insert(timers, timer)
+  return timer
 end
 
 local function setRaw(id, v)
@@ -197,6 +200,67 @@ end
 check(edited, "dragging a joint edits pose and repaints")
 check(widgets.dirtyInfo.value:find("Edited") ~= nil, "dirty state shown: " .. tostring(widgets.dirtyInfo.value))
 
+-- A joint drag renders only the painted frame and keeps the art composite (#8). Ghost frames and
+-- composites are counted through Ghost, which the dialog calls them through.
+do
+  local renders, composites = 0, 0
+  local renderFrame, composite = M.Ghost.renderFrame, M.Ghost.composite
+  M.Ghost.renderFrame = function(...) renders = renders + 1; return renderFrame(...) end
+  M.Ghost.composite = function(...) composites = composites + 1; return composite(...) end
+  local spot
+  local g = fakeGC(widgets.preview.t.width, widgets.preview.t.height)
+  function g:fillRect(r) if r.width == 5 and not spot then spot = { x = r.x + 2, y = r.y + 2 } end end
+  widgets.preview.t.onpaint({ context = g })
+  local MOVES, edits = 3, 0
+  renders, composites = 0, 0
+  widgets.preview.t.onmousedown({ x = spot.x, y = spot.y, button = MouseButton.LEFT })
+  for i = 1, MOVES do
+    local r0 = repaints
+    widgets.preview.t.onmousemove({ x = spot.x + 2 * i, y = spot.y + i })
+    widgets.preview.t.onpaint({ context = fakeGC(280, 220) })
+    if repaints > r0 then edits = edits + 1 end
+  end
+  widgets.preview.t.onmouseup({ x = spot.x + 2 * MOVES, y = spot.y + MOVES })
+  check(edits == MOVES and renders == MOVES and composites == 0, string.format(
+    "a %d-move joint drag renders one ghost frame per move and keeps the art (%d edits, %d frames, %d composites)",
+    MOVES, edits, renders, composites))
+  -- Art is composited again whenever it may have changed (#8 review): Apply on release, a
+  -- settings change, and the artist editing the sprite. The newest composite is kept to read.
+  local last
+  M.Ghost.composite = function(...)
+    composites = composites + 1
+    last = composite(...)
+    return last
+  end
+  local function paint() widgets.preview.t.onpaint({ context = fakeGC(280, 220) }) end
+  setRaw("autoApply", true)
+  composites = 0
+  widgets.preview.t.onmousedown({ x = spot.x + 2 * MOVES, y = spot.y + MOVES, button = MouseButton.LEFT })
+  widgets.preview.t.onmousemove({ x = spot.x, y = spot.y })
+  widgets.preview.t.onmouseup({ x = spot.x, y = spot.y })
+  paint()
+  setRaw("autoApply", false)
+  check(M.Ghost.findLayer(spr, M.Ghost.ALL) ~= nil and composites == 1,
+        "auto-apply after a drag composites the art once again (" .. composites .. " composites)")
+  composites = 0
+  set("opacity", 50)
+  paint()
+  check(composites == 1, "a settings change composites the art again (" .. composites .. " composites)")
+  composites = 0
+  local green = app.pixelColor.rgba(0, 255, 0, 255)
+  local artLayer
+  for _, l in ipairs(spr.layers) do if l.name == "Layer 1" then artLayer = l end end
+  -- A pixel inside the art, so the art's bounds, which Fit measures below, stay as they were.
+  local cel = artLayer:cel(1)
+  local was = cel.image:getPixel(30, 40)
+  app.transaction("art edit", function() cel.image:drawPixel(30, 40, green) end)
+  paint()
+  check(composites == 1 and last:getPixel(30, 40) == green,
+        "an art edit in the sprite shows in the preview (" .. composites .. " composites)")
+  app.transaction("art edit back", function() cel.image:drawPixel(30, 40, was) end)
+  M.Ghost.renderFrame, M.Ghost.composite = renderFrame, composite
+end
+
 -- easing
 set("ease", "Ease out")
 check(true, "ease change ok")
@@ -292,6 +356,18 @@ set("style", "Joints + arcs"); set("travel", true)
 click("next"); click("prev"); click("play"); click("play")
 check(true, "transport buttons ok")
 
+-- FPS changed while playing sets the play speed at once, not at the next Play (#8).
+do
+  click("play")
+  local play
+  for _, t in ipairs(timers) do if t.running then play = t end end
+  set("fps", 24)
+  check(play and play.running and math.abs(play.interval - 1 / 24) < 1e-9,
+        "an FPS change while playing sets the play timer to it (" .. tostring(play and play.interval) .. " s)")
+  click("play")
+  set("fps", 12)
+end
+
 -- fit, with the Boots layer still active
 check(app.layer == boots and widgets.height.value ~= 40, "fit button starts from a changed height")
 click("fit")
@@ -313,6 +389,17 @@ click("apply")
 check(#spr.frames == 12 and M.Ghost.loadSettings(layer).addFrames == true,
       "apply with Add frames on adds frames to 12 and saves the option (" .. #spr.frames .. ")")
 check(widgets.addFrames.text == "Add frames", "the check reads plain Add frames once the cycle fits")
+-- A frame Apply added is composited when shown: before, it was past the sprite's end and had no art.
+do
+  local shown = {}
+  local composite = M.Ghost.composite
+  M.Ghost.composite = function(sprite, fr) table.insert(shown, fr); return composite(sprite, fr) end
+  set("frame", 5)
+  widgets.preview.t.onpaint({ context = fakeGC(280, 220) })
+  M.Ghost.composite = composite
+  check(#shown == 1 and shown[1] == 5, "a frame Apply added is composited when shown (" .. table.concat(shown, ",") .. ")")
+  set("frame", 1)
+end
 
 -- Another sprite active, its own layer and frame 3 (#3): Fit measures only the dialog's sprite,
 -- and Apply writes the dialog's sprite without leaving the artist on it.
@@ -542,6 +629,47 @@ end
 click("remove")
 check(M.Ghost.findLayer(spr, M.Ghost.ALL) == nil, "remove ghost")
 click("close")
+
+-- Closing the dialog stops it listening to its sprite (#8 review): a later edit repaints nothing.
+-- A sprite of its own, since the first dialog above was replaced without being closed.
+do
+  local fresh = Sprite(32, 32, ColorMode.RGB)
+  app.sprite = fresh
+  for k in pairs(widgets) do widgets[k] = nil end
+  M.UI.open()
+  local cel = fresh.cels[1]
+  local r0 = repaints
+  app.transaction("art edit", function() cel.image:drawPixel(3, 3, app.pixelColor.rgba(0, 255, 0, 255)) end)
+  local open = repaints - r0
+  click("close")
+  r0 = repaints
+  app.transaction("art edit", function() cel.image:drawPixel(4, 4, app.pixelColor.rgba(0, 255, 0, 255)) end)
+  check(open == 1 and repaints == r0, string.format(
+    "a dialog repaints on a sprite edit while open (%d) and not once closed (%d)", open, repaints - r0))
+  fresh:close()
+  app.sprite = spr
+end
+
+-- Where this Aseprite has no sprite events, Apply still composites the art again (#8 review).
+do
+  local watch = M.UI.watchSprite
+  M.UI.watchSprite = function() return nil end
+  for k in pairs(widgets) do widgets[k] = nil end
+  app.sprite = spr
+  M.UI.open()
+  local composites = 0
+  local composite = M.Ghost.composite
+  M.Ghost.composite = function(...) composites = composites + 1; return composite(...) end
+  widgets.preview.t.onpaint({ context = fakeGC(280, 220) })
+  composites = 0
+  click("apply")
+  widgets.preview.t.onpaint({ context = fakeGC(280, 220) })
+  M.Ghost.composite = composite
+  M.UI.watchSprite = watch
+  check(composites == 1, "with no sprite events, Apply composites the art again (" .. composites .. " composites)")
+  click("remove")
+  click("close")
+end
 
 -- Ghosts wherever they are (#6): one moved into a group and one whose tag was renamed. Range lists
 -- the orphan in its existing combobox, no new row; Apply on it says so, auto-apply stays silent,
