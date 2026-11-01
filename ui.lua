@@ -53,7 +53,9 @@ return function(M)
     -- State ------------------------------------------------------------------
     local dlg, S, work, build
     local dirty = false
+    -- Ghost preview frames and art composites by frame, each made when first painted (#8).
     local ghostImgs, bgCache = {}, {}
+    local ghostPixel = Ghost.pixelConverter(ColorMode.RGB)
     local cur, playing, drag = 1, false, nil
     local view = { x = 0, y = 0, z = 1 }
     local playTimer, changeTimer, applyTimer
@@ -178,6 +180,17 @@ return function(M)
       return bgCache[fr]
     end
 
+    -- Preview image of ghost frame i, rendered the first time it is painted after a rebuild.
+    local function ghostFor(i)
+      if not ghostImgs[i] and build.frames[i] then
+        local img = Image(sprite.width, sprite.height, ColorMode.RGB)
+        img:clear()
+        Ghost.renderFrame(img, build, i, S, ghostPixel)
+        ghostImgs[i] = img
+      end
+      return ghostImgs[i]
+    end
+
     local function markLabel()
       local N = build.N
       local i, j = Clip.segmentAt(work, (cur - 1) / N)
@@ -210,19 +223,15 @@ return function(M)
       dlg:modify { id = "addFrames", text = text, enabled = S.scope == Ghost.ALL }
     end
 
-    local function rebuild()
+    -- Rebuilds the ghost; each frame renders when painted. `keepArt`: a pose edit (a joint drag,
+    -- spacing, revert) leaves the art as it was, so its composites are kept. A settings change
+    -- drops them, so art the artist changed since shows; the painted frame is composited again.
+    local function rebuild(keepArt)
       if not alive() then return end
       refreshFit()
       build = Ghost.build(S, work, lib.rigs[work.rig])
       ghostImgs = {}
-      bgCache = {}
-      local toPixel = Ghost.pixelConverter(ColorMode.RGB)
-      for i = 1, build.N do
-        local img = Image(sprite.width, sprite.height, ColorMode.RGB)
-        img:clear()
-        Ghost.renderFrame(img, build, i, S, toPixel)
-        ghostImgs[i] = img
-      end
+      if not keepArt then bgCache = {} end
       if cur > build.N then cur = 1 end
       dlg:modify { id = "frame", min = 1, max = build.N, value = cur }
       updatePoseUI()
@@ -304,7 +313,7 @@ return function(M)
       val = nearAngle(val, old)
       if Clip.setPoseKey(work, ch, fr.tw, side, val, build.N, S.params[work.name]) then
         dirty = true
-        rebuild()
+        rebuild(true)
       end
     end
 
@@ -330,7 +339,7 @@ return function(M)
         local bg = bgFor(cur)
         if bg then gc:drawImage(bg, bg.bounds, dst) end
       end
-      local g = ghostImgs[cur]
+      local g = ghostFor(cur)
       if g then
         gc.opacity = max(60, floor(S.opacity * 255 / 100))
         gc:drawImage(g, g.bounds, dst)
@@ -532,7 +541,7 @@ return function(M)
     local function onRevert()
       work = Clip.clone(lib.clips[S.clip] or lib.clips[lib.names[1]])
       S.clipData, dirty = nil, false
-      rebuild()
+      rebuild(true)
     end
 
     -- Dialog -----------------------------------------------------------------
@@ -651,7 +660,7 @@ return function(M)
       if not i then return end
       work.marks[i].ease = dlg.data.ease
       dirty = true
-      rebuild()
+      rebuild(true)
       if dlg.data.autoApply then applyTimer:stop(); applyTimer:start() end
     end }
     W:label { id = "dirtyInfo", text = "" }

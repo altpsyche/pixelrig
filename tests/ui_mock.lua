@@ -195,6 +195,33 @@ end
 check(edited, "dragging a joint edits pose and repaints")
 check(widgets.dirtyInfo.value:find("Edited") ~= nil, "dirty state shown: " .. tostring(widgets.dirtyInfo.value))
 
+-- A joint drag renders only the painted frame and keeps the art composite (#8). Ghost frames and
+-- composites are counted through Ghost, which the dialog calls them through.
+do
+  local renders, composites = 0, 0
+  local renderFrame, composite = M.Ghost.renderFrame, M.Ghost.composite
+  M.Ghost.renderFrame = function(...) renders = renders + 1; return renderFrame(...) end
+  M.Ghost.composite = function(...) composites = composites + 1; return composite(...) end
+  local spot
+  local g = fakeGC(widgets.preview.t.width, widgets.preview.t.height)
+  function g:fillRect(r) if r.width == 5 and not spot then spot = { x = r.x + 2, y = r.y + 2 } end end
+  widgets.preview.t.onpaint({ context = g })
+  local MOVES, edits = 3, 0
+  renders, composites = 0, 0
+  widgets.preview.t.onmousedown({ x = spot.x, y = spot.y, button = MouseButton.LEFT })
+  for i = 1, MOVES do
+    local r0 = repaints
+    widgets.preview.t.onmousemove({ x = spot.x + 2 * i, y = spot.y + i })
+    widgets.preview.t.onpaint({ context = fakeGC(280, 220) })
+    if repaints > r0 then edits = edits + 1 end
+  end
+  widgets.preview.t.onmouseup({ x = spot.x + 2 * MOVES, y = spot.y + MOVES })
+  M.Ghost.renderFrame, M.Ghost.composite = renderFrame, composite
+  check(edits == MOVES and renders == MOVES and composites == 0, string.format(
+    "a %d-move joint drag renders one ghost frame per move and keeps the art (%d edits, %d frames, %d composites)",
+    MOVES, edits, renders, composites))
+end
+
 -- easing
 set("ease", "Ease out")
 check(true, "ease change ok")
