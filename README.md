@@ -89,7 +89,7 @@ roadmap.
 scripts/install-hooks.sh                       # once per clone: pre-push runs verify.sh
 ASEPRITE=/path/to/aseprite scripts/verify.sh   # everything CI runs, plus the Aseprite tests
 tools/dev-install.sh               # link checkout into ~/.config/aseprite/extensions/pixelrig
-tools/test.sh /path/to/aseprite    # headless tests + render sheets in tests/out/
+tools/test.sh /path/to/aseprite    # every Aseprite suite, then fails if any did; sheets in tests/out/
 tools/package.sh                   # build dist/*.aseprite-extension and dist/*.zip
 ```
 

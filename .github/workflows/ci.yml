@@ -23,8 +23,9 @@ jobs:
   # frontier query tests and the Jev tools' tests against a fake server (plain Node, no packages,
   # plus the runner's jq for the query tests and the stubs; no TYPESAFE_API_KEY: Jev never runs in
   # CI, ADR-0002), the gitleaks secret scan, and PixelRig's checks: Lua syntax (luac5.4), clip and
-  # rig JSON, the release gate's test and notes, and the release archive. The Aseprite batch tests
-  # need a binary CI does not have; they run locally (AGENTS.md § Verifying your work).
+  # rig JSON, the release gate's test and notes, the release archive, and tools/test.sh's self-test
+  # against a stub binary. The Aseprite batch tests need a binary CI does not have; they run
+  # locally (AGENTS.md § Verifying your work).
   # Update AGENTS.md § Verifying your work in the same commit.
   verify:
     runs-on: ubuntu-latest

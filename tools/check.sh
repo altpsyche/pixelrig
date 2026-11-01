@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # PixelRig's project checks, run by scripts/verify.sh (and so by CI and the pre-push hook).
-#   tools/check.sh                       Lua syntax, clip/rig JSON, release gate, release archive
+#   tools/check.sh                       Lua syntax, clip/rig JSON, release gate, release archive,
+#                                        tools/test.sh self-test
 #   ASEPRITE=/path/to/aseprite tools/check.sh   plus the Aseprite batch tests
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -46,6 +47,28 @@ if command -v zip >/dev/null && command -v unzip >/dev/null; then
 else
   echo "verify: zip/unzip not found, package check skipped (CI runs it)" >&2
 fi
+
+# Self-test: tools/test.sh runs every Aseprite suite and fails at the end when any failed, so one
+# failure never hides another (#12). A stub aseprite fails every suite and logs which it ran.
+stub="$(mktemp -d)"
+cat >"$stub/aseprite" <<'STUB'
+#!/usr/bin/env bash
+echo "$*" >>"$(dirname "$0")/ran.log"
+echo "FAIL stub suite"
+exit 1
+STUB
+chmod +x "$stub/aseprite"
+if tools/test.sh "$stub/aseprite" "$stub/out" >/dev/null 2>&1; then
+  echo "verify: tools/test.sh passed although every Aseprite suite failed" >&2
+  exit 1
+fi
+ran="$(cat "$stub/ran.log" 2>/dev/null || true)"
+if [ "$(grep -c 'headless\.lua' <<<"$ran")" != 1 ] || [ "$(grep -c 'ui_mock\.lua' <<<"$ran")" != 2 ]; then
+  echo "verify: tools/test.sh stopped before running every Aseprite suite; it ran:" >&2
+  echo "${ran:-nothing}" >&2
+  exit 1
+fi
+rm -rf "$stub"
 
 # Aseprite batch tests: build, render, apply (tests/headless.lua) and the dialog through a mock
 # (tests/ui_mock.lua). Needs an Aseprite binary: $ASEPRITE, or aseprite on PATH. CI has none.
