@@ -3,21 +3,56 @@
 
 local Rig = {}
 
--- Set by the loader (Util.readJson).
-Rig.readJson = nil
+Rig.readJson = nil -- set by loader
 
-function Rig.load(path)
-  local rig = Rig.readJson(path)
+Rig.PRESETS = {
+  { name = "Default", head = 100, torso = 100, arms = 100, legs = 100, bulk = 100 },
+  { name = "Heroic",  head = 85,  torso = 105, arms = 105, legs = 112, bulk = 100 },
+  { name = "Chibi",   head = 200, torso = 80,  arms = 75,  legs = 65,  bulk = 130 },
+  { name = "Stocky",  head = 110, torso = 95,  arms = 90,  legs = 85,  bulk = 150 },
+}
+
+function Rig.preset(name)
+  for _, p in ipairs(Rig.PRESETS) do
+    if p.name == name then return p end
+  end
+  return nil
+end
+
+-- Scale so standing height (ground to head top) == 1.0
+local function normalize(rig)
   local b = rig.bones
-  -- Normalize so standing height (ground to head top) == 1.0
   local stand = b.thigh + b.shin + b.ankleH + b.torso + b.neck + 2 * b.headR
   for k, v in pairs(b) do b[k] = v / stand end
   for k, v in pairs(rig.widths) do rig.widths[k] = v / stand end
   return rig
 end
 
-local rad = math.rad
-local sin, cos = math.sin, math.cos
+function Rig.load(path)
+  return normalize(Rig.readJson(path))
+end
+
+-- New rig with proportion multipliers in percent: head, torso, arms, legs, bulk.
+function Rig.withProportions(base, p)
+  local rig = { name = base.name, bones = {}, widths = {} }
+  for k, v in pairs(base.bones) do rig.bones[k] = v end
+  for k, v in pairs(base.widths) do rig.widths[k] = v end
+  if not p then return rig end
+  local b, w = rig.bones, rig.widths
+  b.headR = b.headR * p.head / 100
+  b.torso = b.torso * p.torso / 100
+  b.neck = b.neck * p.torso / 100
+  b.upperArm = b.upperArm * p.arms / 100
+  b.forearm = b.forearm * p.arms / 100
+  b.thigh = b.thigh * p.legs / 100
+  b.shin = b.shin * p.legs / 100
+  b.foot = b.foot * (100 + p.legs) / 200
+  for k, v in pairs(w) do w[k] = v * p.bulk / 100 end
+  return normalize(rig)
+end
+
+local rad, deg = math.rad, math.deg
+local sin, cos, atan = math.sin, math.cos, math.atan
 
 -- Direction from angle measured from straight down, + = forward.
 local function down(a)
@@ -34,6 +69,11 @@ local function along(p, a, len)
   local dx, dy = down(a)
   return add(p, dx, dy, len)
 end
+
+-- Angle of vector (dx, dy) measured from straight down, + = forward.
+function Rig.angleFromDown(dx, dy) return deg(atan(dx, dy)) end
+-- Angle of vector measured from straight up, + = forward.
+function Rig.angleFromUp(dx, dy) return deg(atan(dx, -dy)) end
 
 -- Rotate local foot-space point (x fwd, y down) by pitch (+ = toes down).
 local function footPoint(ankle, pitch, lx, ly)
@@ -52,6 +92,11 @@ local function solveSide(rig, hip, shoulder, s)
   local pitch = s["leg.foot"] or 0
   out.toe = footPoint(out.ankle, pitch, b.foot, b.ankleH)
   out.heel = footPoint(out.ankle, pitch, -b.heel, b.ankleH)
+  if out.toe.y >= out.heel.y then
+    out.lowest, out.contact = out.toe.y, "toe"
+  else
+    out.lowest, out.contact = out.heel.y, "heel"
+  end
 
   local sh = s["arm.shoulder"] or 0
   local fore = sh + (s["arm.elbow"] or 0)
@@ -81,11 +126,9 @@ function Rig.solve(rig, pose)
   sk.near = solveSide(rig, sk.hip, sk.shoulder, pose.near)
   sk.far = solveSide(rig, sk.hip, sk.shoulder, pose.far)
 
-  local lowest = -math.huge
-  for _, side in ipairs({ sk.near, sk.far }) do
-    lowest = math.max(lowest, side.toe.y, side.heel.y)
-  end
-  sk.ground = lowest + (pose["root.lift"] or 0)
+  local lift = pose["root.lift"] or 0
+  sk.lift = lift
+  sk.ground = math.max(sk.near.lowest, sk.far.lowest) + lift
   return sk
 end
 

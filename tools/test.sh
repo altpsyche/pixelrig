@@ -6,4 +6,6 @@ aseprite="${1:?path to aseprite binary}"
 out="${2:-$root/tests/out}"
 mkdir -p "$out"
 "$aseprite" -b --script-param root="$root" --script-param out="$out" --script "$root/tests/headless.lua"
+
+"$aseprite" -b --script-param root="$root" --script-param out="$out" --script "$root/tests/ui_mock.lua"
 echo "Sheets written to $out"
