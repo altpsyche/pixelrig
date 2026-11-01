@@ -13,6 +13,7 @@ return function(Clip, Rig, Render, Colors, Util)
     style = "Stick", facing = "Right", thickness = 1, pixelPerfect = true,
     height = 48, groundY = 63, cx = 32,
     frames = 12, fps = 12, timing = false, fillAll = true, labels = true,
+    addFrames = false, -- ADR-0005: Apply adds frames only when the artist turns this on
     colorScheme = "Mono", opacity = 40,
     schemeColors = {}, -- schemeColors[scheme][slotId] = {r, g, b}; missing slots use scheme defaults
     travel = false, travelSpeed = 100, footprints = true, groundLine = false,
@@ -53,6 +54,17 @@ return function(Clip, Rig, Render, Colors, Util)
     return tag.fromFrame.frameNumber, tag.toFrame.frameNumber
   end
 
+  -- How much of the cycle Apply places in s.scope: the cycle frames that fit, the cycle length,
+  -- and how many frames Apply adds. Frames are added only on All frames with s.addFrames on
+  -- (ADR-0005); a tag range never grows. Nil if the tag is gone.
+  function Ghost.cycleFit(sprite, s)
+    local first, last = Ghost.scopeRange(sprite, s.scope)
+    if not first then return nil end
+    local N, len = s.frames, last - first + 1
+    local add = (s.scope == Ghost.ALL and s.addFrames == true) and math.max(0, N - len) or 0
+    return math.min(N, len + add), N, add
+  end
+
   function Ghost.isGhost(layer)
     return layer and layer.data == Ghost.MARK
   end
@@ -82,6 +94,9 @@ return function(Clip, Rig, Render, Colors, Util)
       }
     end
     data.color, data.color2 = nil, nil
+    -- ADR-0005: the option is on only when saved as true; any other value (a hand-edited "false",
+    -- a number) is off.
+    data.addFrames = data.addFrames == true
     return Util.merge(Ghost.DEFAULTS, data)
   end
 
@@ -329,15 +344,22 @@ return function(Clip, Rig, Render, Colors, Util)
     if note then return note end
     local build = Ghost.build(s, clip, baseRig)
     local N = build.N
+    local _, _, add = Ghost.cycleFit(sprite, s)
 
     transactionOn(sprite, "Ghost Reference", function()
       local layer = ensureLayer(sprite, s.scope)
       layer.name = "Ghost: " .. clip.name .. (s.scope ~= Ghost.ALL and (" [" .. s.scope .. "]") or "")
       layer.opacity = math.floor(s.opacity * 255 / 100 + 0.5)
 
-      if s.scope == Ghost.ALL then
-        while #sprite.frames < N do sprite:newEmptyFrame(#sprite.frames + 1) end
-        last = #sprite.frames
+      if add > 0 then
+        -- newEmptyFrame grows a tag that ends on the last frame; the artist's tags keep their range.
+        local ends = {}
+        for _, tag in ipairs(sprite.tags) do table.insert(ends, { tag = tag, to = tag.toFrame.frameNumber }) end
+        for _ = 1, add do sprite:newEmptyFrame(#sprite.frames + 1) end
+        for _, e in ipairs(ends) do
+          if e.tag.toFrame.frameNumber ~= e.to then e.tag.toFrame = e.to end
+        end
+        last = last + add
       end
       if s.timing then
         for fr = first, math.min(last, first + N - 1) do sprite.frames[fr].duration = 1 / s.fps end
@@ -370,7 +392,7 @@ return function(Clip, Rig, Render, Colors, Util)
 
       clearTags(sprite, s.scope)
       if s.labels then
-        if s.scope == Ghost.ALL then addTag(sprite, 1, N, clip.name, { 0, 170, 255 }, s.scope) end
+        if s.scope == Ghost.ALL then addTag(sprite, 1, math.min(N, last), clip.name, { 0, 170, 255 }, s.scope) end
         for i = 0, math.min(N, last - first + 1) - 1 do
           local m = Clip.markForFrame(clip, i, N)
           if m then addTag(sprite, first + i, first + i, m, { 120, 120, 120 }, s.scope) end

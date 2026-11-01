@@ -19,7 +19,7 @@ local function add(kind, t)
   if kind == "slider" then
     w.value = t.value; w.min = t.min; w.max = t.max
     assert(t.value >= t.min and t.value <= t.max, t.id .. " value out of range")
-  elseif kind == "check" then w.value = t.selected or false
+  elseif kind == "check" then w.value = t.selected or false; w.text = t.text
   elseif kind == "combobox" then
     w.value = t.option; w.options = t.options
     local found = false
@@ -59,10 +59,13 @@ function mock:modify(t)
     for _, o in ipairs(w.options or {}) do if o == t.option then found = true end end
     assert(found, t.id .. " option '" .. tostring(t.option) .. "' not in options")
   end
-  if t.text ~= nil then w.value = t.text end
+  if t.text ~= nil then
+    if w.kind == "check" then w.text = t.text else w.value = t.text end
+  end
   if t.visible ~= nil then w.visible = t.visible end
   if t.label ~= nil then w.label = t.label end
   if t.color ~= nil then w.value = t.color end
+  if t.enabled ~= nil then w.enabled = t.enabled end
   if w.kind == "slider" and (w.value < w.min or w.value > w.max) then
     error(t.id .. " value " .. w.value .. " outside " .. w.min .. ".." .. w.max)
   end
@@ -152,6 +155,11 @@ local openedMotionOnly = widgets.clip.visible and not (widgets.param1.visible or
   or widgets.ease.visible)
 
 check(widgets.height.value == 40 and widgets.groundY.value == 59, "auto-fit on first open")
+-- Adding frames is opt-in (ADR-0005, #27): off on a new ghost, and the check's own text says how
+-- much of the 12-frame cycle fits the 1-frame sprite, so it needs no row of its own.
+check(widgets.addFrames and widgets.addFrames.value == false, "Add frames is off on a new ghost")
+check(widgets.addFrames.text == "Add frames (1 of 12 fit)" and widgets.fitInfo == nil,
+      "the Add frames check says how much of the cycle fits: " .. tostring(widgets.addFrames.text))
 check(widgets.skipped and widgets.skipped.visible
       and widgets.skipped.value == "broken.json: rig 'nope' not found",
       "skipped clip reason shown on one line: " .. tostring(widgets.skipped and widgets.skipped.value))
@@ -205,7 +213,7 @@ if NOTABS then
   check(openedMotionOnly, "no tabs: the dialog opens on the Motion section only")
   -- Every section shows exactly its own controls.
   local SECTIONS = {
-    Motion = { "clip", "skipped", "scope", "frames", "fps", "fillAll", "timing", "labels" },
+    Motion = { "clip", "skipped", "scope", "frames", "fps", "fillAll", "labels", "addFrames", "timing" },
     Clip = { "param1", "param2", "param3", "param4", "param5" },
     Travel = { "travel", "travelSpeed", "footprints", "groundLine" },
     Body = { "preset", "pHead", "pTorso", "pArms", "pLegs", "pBulk", "facing" },
@@ -224,6 +232,27 @@ if NOTABS then
     end
     check(okSection, "no tabs: section " .. name .. " shows its own controls and hides the rest")
   end
+  -- Rows as Aseprite lays them out: a widget starts a row when it has a label, is a separator, or
+  -- is a different kind from the widget made before it. Motion was 6 rows before #27 (with the
+  -- Skipped line shown, as here); adding frames may cost one row, never two, and the cycle not
+  -- fitting (1 of 12 here) adds none.
+  setRaw("section", "Motion")
+  -- Every visible widget made after the picker and before the controls below the sections.
+  local BELOW = { autoApply = true, apply = true, remove = true, close = true }
+  local rows, row, lastKind, inSections = {}, 0, nil, false
+  for _, id in ipairs(order) do
+    local w = widgets[id]
+    if w then
+      if w.t.label or w.kind ~= lastKind or w.kind == "separator" then row = row + 1 end
+      lastKind = w.kind
+      if inSections and w.visible and not BELOW[id] then rows[row] = true end
+      if id == "section" then inSections = true end
+    end
+  end
+  local motionRows = 0
+  for _ in pairs(rows) do motionRows = motionRows + 1 end
+  check(motionRows == 7 and widgets.addFrames.text == "Add frames (1 of 12 fit)",
+        "no tabs: Motion is one row taller than before #27 while the cycle does not fit (" .. motionRows .. " rows)")
   -- Controls outside the sections stay visible whatever section is shown.
   check(widgets.frame.visible and widgets.apply.visible and widgets.preview.visible,
         "no tabs: preview, transport and Apply stay visible")
@@ -272,6 +301,16 @@ local layer = M.Ghost.findLayer(spr, M.Ghost.ALL)
 check(layer ~= nil, "apply creates ghost layer")
 local saved = M.Ghost.loadSettings(layer)
 check(saved and saved.clipData ~= nil and saved.style == "Joints + arcs", "edited clip + settings saved on layer")
+check(#spr.frames == 1 and saved.addFrames == false, "apply with Add frames off adds no frame (" .. #spr.frames .. ")")
+
+-- Ticking Add frames: the dialog says what Apply will add, and Apply adds it.
+set("addFrames", true)
+check(widgets.addFrames.text == "Add 11 frames",
+      "with Add frames on the check says what Apply adds: " .. tostring(widgets.addFrames.text))
+click("apply")
+check(#spr.frames == 12 and M.Ghost.loadSettings(layer).addFrames == true,
+      "apply with Add frames on adds frames to 12 and saves the option (" .. #spr.frames .. ")")
+check(widgets.addFrames.text == "Add frames", "the check reads plain Add frames once the cycle fits")
 
 -- Another sprite active, its own layer and frame 3 (#3): Fit measures only the dialog's sprite,
 -- and Apply writes the dialog's sprite without leaving the artist on it.
@@ -308,6 +347,8 @@ check(widgets.clip.value == "Run test", "clip combobox switched to saved clip")
 -- scope switch to tag
 set("scope", "idle")
 check(widgets.scope.value == "idle", "scope switched to tag")
+check(widgets.addFrames.enabled == false and widgets.addFrames.text == "Add frames (1 of 2 fit)",
+      "a tag range disables Add frames and says how much fits: " .. tostring(widgets.addFrames.text))
 click("apply")
 check(M.Ghost.findLayer(spr, "idle") ~= nil, "tag ghost applied")
 
@@ -316,7 +357,8 @@ os.remove(brokenClip)
 for k in pairs(widgets) do widgets[k] = nil end
 app.layer = layer
 M.UI.open()
-check(widgets.style.value == "Joints + arcs" and widgets.colorScheme.value == "Segments", "reopen restores settings")
+check(widgets.style.value == "Joints + arcs" and widgets.colorScheme.value == "Segments"
+      and widgets.addFrames.value == true and widgets.addFrames.enabled ~= false, "reopen restores settings, Add frames too")
 check(not widgets.skipped.visible, "no skipped line when every clip loads")
 
 -- Corrupt settings on the ghost layer: the dialog still opens, with defaults (#4).
@@ -336,6 +378,10 @@ end
 local opened, why = reopenWith(json.encode({ style = "Capsule", clip = "Run", clipData = { name = "Run" } }))
 check(opened and widgets.style.value == "Capsule" and widgets.dirtyInfo.value == "Clip unchanged",
       "corrupt edited clip in settings -> library clip " .. tostring(why or ""))
+check(widgets.addFrames.value == false, "a ghost saved without the option opens with Add frames off")
+opened, why = reopenWith(json.encode({ addFrames = "false" }))
+check(opened and widgets.addFrames.value == false, "a ghost saved with addFrames = \"false\" opens with Add frames off"
+      .. (why and (" (" .. tostring(why) .. ")") or ""))
 
 -- Drag every joint on a clip without leg.thigh or arm.shoulder: nothing raises (#4).
 do

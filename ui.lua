@@ -152,6 +152,7 @@ return function(M)
       S.style, S.facing, S.thickness, S.pixelPerfect = d.style, d.facing, d.thickness, d.pixelPerfect
       S.height, S.groundY, S.cx = d.height, d.groundY, d.cx
       S.frames, S.fps, S.timing, S.fillAll, S.labels = d.frames, d.fps, d.timing, d.fillAll, d.labels
+      S.addFrames = d.addFrames
       S.opacity = d.opacity
       storeColors()
       S.travel, S.travelSpeed, S.footprints, S.groundLine = d.travel, d.travelSpeed, d.footprints, d.groundLine
@@ -195,8 +196,23 @@ return function(M)
       dlg:modify { id = "dirtyInfo", text = dirty and ("Edited '" .. work.name .. "' (kept with ghost on Apply)") or "Clip unchanged" }
     end
 
+    -- The Add frames check says what Apply does with a cycle longer than the range (#27): how
+    -- much fits, or how many frames it adds. Its own text, so it costs no extra row on small
+    -- screens. Add frames applies to All frames only; a tag range never grows.
+    local function refreshFit()
+      local fit, cycle, add = Ghost.cycleFit(sprite, S)
+      local text = "Add frames"
+      if add and add > 0 then
+        text = string.format("Add %d frame%s", add, add == 1 and "" or "s")
+      elseif fit and fit < cycle then
+        text = string.format("Add frames (%d of %d fit)", fit, cycle)
+      end
+      dlg:modify { id = "addFrames", text = text, enabled = S.scope == Ghost.ALL }
+    end
+
     local function rebuild()
       if not alive() then return end
+      refreshFit()
       build = Ghost.build(S, work, lib.rigs[work.rig])
       ghostImgs = {}
       bgCache = {}
@@ -235,6 +251,7 @@ return function(M)
       local err = Ghost.apply(sprite, S, work, lib.rigs[work.rig])
       if err then app.alert(err) end
       bgCache = {}
+      refreshFit()
     end
 
     function changed()
@@ -400,6 +417,7 @@ return function(M)
         style = S.style, facing = S.facing, thickness = S.thickness, pixelPerfect = S.pixelPerfect,
         height = S.height, groundY = S.groundY, cx = S.cx,
         frames = S.frames, fps = S.fps, timing = S.timing, fillAll = S.fillAll, labels = S.labels,
+        addFrames = S.addFrames,
         colorScheme = S.colorScheme, opacity = S.opacity,
         travel = S.travel, travelSpeed = S.travelSpeed, footprints = S.footprints, groundLine = S.groundLine,
         pHead = p.head, pTorso = p.torso, pArms = p.arms, pLegs = p.legs, pBulk = p.bulk,
@@ -578,8 +596,10 @@ return function(M)
     W:slider { id = "frames", label = "Frames", min = 2, max = 48, value = S.frames, onchange = changed }
     W:slider { id = "fps", label = "FPS", min = 1, max = 60, value = S.fps, onchange = changed }
     W:check { id = "fillAll", label = "Frames", text = "Loop over range", selected = S.fillAll, onclick = changed }
-    W:check { id = "timing", text = "Set frame durations", selected = S.timing, onclick = changed }
     W:check { id = "labels", text = "Key pose tags", selected = S.labels, onclick = changed }
+    -- Both change the artist's timeline, so both are opt-in and off by default (ADR-0005).
+    W:check { id = "addFrames", label = "Timeline", text = "Add frames", selected = S.addFrames, onclick = changed }
+    W:check { id = "timing", text = "Set frame durations", selected = S.timing, onclick = changed }
     sec:begin("secClip")
     for i = 1, MAXP do
       W:slider { id = "param" .. i, label = "Param", min = 0, max = 100, value = 0, visible = false, onchange = changed }

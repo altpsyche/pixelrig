@@ -206,11 +206,11 @@ do
   local fit = Ghost.fitToArt(spr, 1)
   check(fit and fit.height == 30 and fit.groundY == 59 and fit.cx == 32, "fit to art bounds")
 
-  local s = settings { height = fit.height, groundY = fit.groundY, cx = fit.cx, frames = 12 }
+  local s = settings { height = fit.height, groundY = fit.groundY, cx = fit.cx, frames = 12, addFrames = true }
   check(Ghost.apply(spr, s, lib.clips.Run, rig) == nil, "apply all frames")
   local layer = Ghost.findLayer(spr, Ghost.ALL)
   check(layer and layer.isReference, "ghost layer is reference")
-  check(#spr.frames == 12, "frames added to 12")
+  check(#spr.frames == 12, "frames added to 12 with add frames on")
   local loaded = Ghost.loadSettings(layer)
   check(loaded and loaded.height == 30 and loaded.cx == 32, "settings persisted on layer")
 
@@ -277,9 +277,8 @@ do
 end
 
 -- Apply and Remove leave the artist where they were (#3): a 3-frame sprite, frame 1 and an art
--- layer active, a 5-frame ghost that adds frames; then the same with another sprite active.
--- Apply still adds frames by default; ADR-0005 puts that behind an option (#27), which will
--- turn it on here.
+-- layer active, a 5-frame ghost that adds frames (opted in, ADR-0005); then the same with
+-- another sprite active.
 do
   local other = Sprite(32, 32, ColorMode.RGB)
   other:newEmptyFrame(2); other:newEmptyFrame(3)
@@ -297,13 +296,13 @@ do
       app.layer and app.layer.name or "nil", app.frame and app.frame.frameNumber or "nil")
   end
 
-  local s = settings { frames = 5, height = 40, groundY = 60, cx = 32 }
+  local s = settings { frames = 5, height = 40, groundY = 60, cx = 32, addFrames = true }
   check(Ghost.apply(spr, s, lib.clips.Run, rig) == nil and #spr.frames == 5, "apply adds frames to 5")
   check(app.sprite == spr and app.layer == art and app.frame.frameNumber == 1,
         "apply keeps the active sprite, layer and frame (" .. where() .. ")")
 
   app.sprite = other; app.layer = otherLayer; app.frame = 3
-  local s2 = settings { frames = 8, height = 40, groundY = 60, cx = 32, scope = Ghost.ALL }
+  local s2 = settings { frames = 8, height = 40, groundY = 60, cx = 32, scope = Ghost.ALL, addFrames = true }
   check(Ghost.apply(spr, s2, lib.clips.Run, rig) == nil and #spr.frames == 8 and #other.frames == 3,
         "apply with another sprite active writes only the given sprite")
   check(app.sprite == other and app.layer == otherLayer and app.frame.frameNumber == 3,
@@ -339,7 +338,7 @@ do
   local spr = Sprite(64, 64, ColorMode.RGB)
   spr:newEmptyFrame(2); spr:newEmptyFrame(3)
   app.sprite = other
-  check(Ghost.apply(spr, settings { frames = 5 }, lib.clips.Run, rig) == nil
+  check(Ghost.apply(spr, settings { frames = 5, addFrames = true }, lib.clips.Run, rig) == nil
         and #spr.frames == 5 and #spr.layers == 2, "apply with another sprite active adds a layer and frames")
   app.sprite = spr
   app.command.Undo()
@@ -348,6 +347,70 @@ do
         #spr.frames .. " frames, " .. #spr.layers .. " layers)")
   spr:close()
   other:close()
+end
+
+-- Adding frames is opt-in (ADR-0005, #27): off by default, Apply fills the frames the sprite
+-- has and Ghost.cycleFit says how much of the cycle fits; on, the frames it adds undo with the
+-- ghost in one step.
+do
+  check(Ghost.DEFAULTS.addFrames == false, "add frames is off by default")
+  local spr = Sprite(64, 64, ColorMode.RGB)
+  for i = 2, 8 do spr:newEmptyFrame(i) end
+  local s = settings { frames = 12, height = 40, groundY = 60, cx = 32 }
+  local fit, cycle, add = Ghost.cycleFit(spr, s)
+  check(fit == 8 and cycle == 12 and add == 0, string.format("add frames off: %s of %s cycle frames fit, %s added",
+        tostring(fit), tostring(cycle), tostring(add)))
+  check(Ghost.apply(spr, s, lib.clips.Run, rig) == nil and #spr.frames == 8,
+        "add frames off: apply leaves the frame count unchanged (" .. #spr.frames .. " frames)")
+  local layer = Ghost.findLayer(spr, Ghost.ALL)
+  local cels = 0
+  for _ in ipairs(layer.cels) do cels = cels + 1 end
+  check(cels == 8, "add frames off: the ghost fills the 8 frames the sprite has (" .. cels .. " cels)")
+  local inRange = true
+  for _, t in ipairs(spr.tags) do
+    if t.toFrame.frameNumber > 8 then inRange = false end
+  end
+  check(inRange, "add frames off: label tags stay inside the sprite's frames")
+
+  -- An artist's tag ending on the last frame: Aseprite's newEmptyFrame would grow it.
+  local outro = spr:newTag(7, 8)
+  outro.name = "outro"
+  s.addFrames = true
+  fit, cycle, add = Ghost.cycleFit(spr, s)
+  check(fit == 12 and cycle == 12 and add == 4, string.format("add frames on: %s of %s fit after adding %s",
+        tostring(fit), tostring(cycle), tostring(add)))
+  local tagScope = settings { scope = "nope", frames = 12, addFrames = true }
+  check(Ghost.cycleFit(spr, tagScope) == nil, "cycleFit on a missing tag is nil")
+  check(Ghost.apply(spr, s, lib.clips.Run, rig) == nil and #spr.frames == 12,
+        "add frames on: apply adds frames to 12 (" .. #spr.frames .. " frames)")
+  check(Ghost.loadSettings(layer).addFrames == true, "add frames on: the option is saved with the ghost")
+  check(outro.fromFrame.frameNumber == 7 and outro.toFrame.frameNumber == 8,
+        "add frames on: an artist's tag ending on the last frame keeps its range (" ..
+        outro.fromFrame.frameNumber .. ".." .. outro.toFrame.frameNumber .. ")")
+  app.command.Undo()
+  check(#spr.frames == 8 and Ghost.loadSettings(Ghost.findLayer(spr, Ghost.ALL)).addFrames == false,
+        "add frames on: one undo removes the added frames with that apply (" .. #spr.frames .. " frames)")
+
+  -- Only a saved true turns it on: a non-boolean value (a hand-edited or corrupt property) is off.
+  for _, v in ipairs({ "false", "true", 1, 0 }) do
+    local layer2 = Ghost.findLayer(spr, Ghost.ALL)
+    layer2.properties("pixelrig").settings = json.encode({ addFrames = v, frames = 12 })
+    local loaded = Ghost.loadSettings(layer2)
+    local s3 = settings { frames = 12, height = 40, groundY = 60, cx = 32, addFrames = v }
+    local _, _, add3 = Ghost.cycleFit(spr, s3)
+    check(loaded.addFrames == false and add3 == 0 and Ghost.apply(spr, s3, lib.clips.Run, rig) == nil
+          and #spr.frames == 8, "a saved addFrames = " .. type(v) .. " " .. tostring(v) .. " is off (" .. #spr.frames .. " frames)")
+  end
+
+  -- A tag range never grows: the option applies to All frames only.
+  local tag = spr:newTag(2, 4)
+  tag.name = "hop"
+  local hop = settings { scope = "hop", frames = 6, addFrames = true, fillAll = false }
+  fit, cycle, add = Ghost.cycleFit(spr, hop)
+  check(fit == 3 and cycle == 6 and add == 0, "a tag range adds no frames: 3 of 6 fit")
+  check(Ghost.apply(spr, hop, lib.clips.Run, rig) == nil and #spr.frames == 8 and tag.toFrame.frameNumber == 4,
+        "apply on a tag range with add frames on leaves frames and tag as they were")
+  spr:close()
 end
 
 -- The ghost is visible on indexed and grayscale sprites (#5): every pixel the RGB render draws is
