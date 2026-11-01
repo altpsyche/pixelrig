@@ -23,13 +23,55 @@ local function normalize(data)
   return data
 end
 
+local function isList(v)
+  return type(v) == "table" and (next(v) == nil or v[1] ~= nil)
+end
+
+-- Why decoded clip data cannot be used, as one short line; nil when it can.
+-- Catches what would otherwise raise in normalize, sampling or the dialog.
+function Clip.check(data)
+  if type(data) ~= "table" then return "not a JSON object" end
+  if type(data.name) ~= "string" or data.name == "" then return "no name" end
+  if type(data.rig) ~= "string" or data.rig == "" then return "no rig named" end
+  if data.channels ~= nil and type(data.channels) ~= "table" then return "channels is not an object" end
+  for name, ch in pairs(data.channels or {}) do
+    if type(ch) ~= "table" or not isList(ch.keys) then
+      return "channel '" .. tostring(name) .. "' has no keys"
+    end
+    for _, k in ipairs(ch.keys) do
+      if type(k) ~= "table" or type(k[1]) ~= "number" or type(k[2]) ~= "number" then
+        return "channel '" .. tostring(name) .. "' has a bad key"
+      end
+    end
+  end
+  if data.params ~= nil and not isList(data.params) then return "params is not a list" end
+  for i, p in ipairs(data.params or {}) do
+    local id = type(p) == "table" and p.id
+    if type(id) ~= "string" then return "param " .. i .. " has no id" end
+    if not isList(p.channels) then return "param '" .. id .. "' has no channels" end
+    for _, f in ipairs({ "min", "max", "default" }) do
+      if type(p[f]) ~= "number" then return "param '" .. id .. "' has no " .. f end
+    end
+  end
+  if data.marks ~= nil and not isList(data.marks) then return "marks is not a list" end
+  for i, m in ipairs(data.marks or {}) do
+    if type(m) ~= "table" or type(m.t) ~= "number" then return "mark " .. i .. " has no time" end
+  end
+  if data.sided ~= nil and not isList(data.sided) then return "sided is not a list" end
+  if data.sideOffset ~= nil and type(data.sideOffset) ~= "number" then return "sideOffset is not a number" end
+  return nil
+end
+
+-- Both raise a one-line reason, with no position prefix, when the clip cannot be used.
 function Clip.load(path, origin)
-  local data = normalize(Clip.readJson(path))
-  data.origin = origin
-  return data
+  local ok, data = pcall(Clip.readJson, path)
+  if not ok then error("not valid JSON", 0) end
+  return Clip.fromData(data, origin)
 end
 
 function Clip.fromData(data, origin)
+  local reason = Clip.check(data)
+  if reason then error(reason, 0) end
   local c = normalize(data)
   c.origin = origin
   return c

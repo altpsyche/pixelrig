@@ -12,6 +12,76 @@ end
 local lib = M.loadLibrary()
 check(lib.clips.Run ~= nil, "library loads Run")
 local rig = lib.rigs.humanoid
+do
+  local builtinSkipped = 0
+  for _, s in ipairs(lib.skipped or {}) do
+    if s.origin == "builtin" then builtinSkipped = builtinSkipped + 1 end
+  end
+  check(lib.skipped and builtinSkipped == 0, "library: every built-in clip loads")
+end
+
+-- Library: bad user clips are skipped with a reason; the rest still load (#4).
+do
+  local dir = app.fs.joinPath(out, "badclips")
+  app.fs.makeAllDirectories(dir)
+  for _, f in ipairs(app.fs.listFiles(dir)) do os.remove(app.fs.joinPath(dir, f)) end
+  local function write(file, edit)
+    local data = Util.readJson(app.fs.joinPath(root, "clips", "run.json"))
+    data.name = file
+    edit(data)
+    Util.writeJson(app.fs.joinPath(dir, file .. ".json"), data)
+  end
+  write("good", function() end)
+  write("norig", function(d) d.rig = nil end)
+  write("missingrig", function(d) d.rig = "nope" end)
+  write("brokenrig", function(d) d.rig = "brokenrig" end)
+  write("nokeys", function(d) d.channels["leg.knee"].keys = nil end)
+  write("badkey", function(d) d.channels["leg.knee"].keys[1] = { "x" } end)
+  write("noparamchannels", function(d) d.params[1].channels = nil end)
+  write("nodefault", function(d) d.params[1].default = nil end)
+  local function writeText(path, text)
+    local f = io.open(path, "w")
+    f:write(text)
+    f:close()
+  end
+  writeText(app.fs.joinPath(dir, "notjson.json"), "{ not json")
+  -- Rigs from a test folder: the real humanoid, and a rig file that exists but cannot be read.
+  local rigDir = app.fs.joinPath(out, "badrigs")
+  app.fs.makeAllDirectories(rigDir)
+  Util.writeJson(app.fs.joinPath(rigDir, "humanoid.json"), Util.readJson(app.fs.joinPath(root, "rigs", "humanoid.json")))
+  writeText(app.fs.joinPath(rigDir, "brokenrig.json"), "[1, 2]")
+
+  local userDir, rigsDir = M.userClipsDir, M.rigsDir
+  M.userClipsDir = function() return dir end
+  M.rigsDir = function() return rigDir end
+  local ok, badLib = pcall(M.loadLibrary)
+  M.userClipsDir, M.rigsDir = userDir, rigsDir
+  check(ok, "library: loading never throws on bad user clips " .. (ok and "" or tostring(badLib)))
+  if ok then
+    check(badLib.clips.Run ~= nil and badLib.clips.good ~= nil, "library: good clips still load beside bad ones")
+    local reasons = {}
+    for _, s in ipairs(badLib.skipped or {}) do reasons[s.file] = s.reason end
+    local function skipped(file, want)
+      local r = reasons[file .. ".json"]
+      check(badLib.clips[file] == nil and r and r:find(want, 1, true) ~= nil,
+            "library: " .. file .. " skipped with reason (" .. tostring(r) .. ")")
+    end
+    skipped("norig", "no rig")
+    skipped("missingrig", "rig 'nope' not found")
+    skipped("nokeys", "channel 'leg.knee'")
+    skipped("badkey", "channel 'leg.knee'")
+    skipped("noparamchannels", "param 'stride'")
+    skipped("nodefault", "param 'stride'")
+    skipped("brokenrig", "rig 'brokenrig' is unreadable")
+    skipped("notjson", "not valid JSON")
+    check(#(badLib.skipped or {}) == 8, "library: exactly the bad clips skipped (" .. #(badLib.skipped or {}) .. ")")
+    local oneLine = true
+    for _, s in ipairs(badLib.skipped or {}) do
+      if s.reason:find("\n", 1, true) or #s.reason > 60 then oneLine = false end
+    end
+    check(oneLine, "library: each reason is one short line")
+  end
+end
 
 local function settings(over)
   local s = Util.merge(Ghost.DEFAULTS, over or {})
