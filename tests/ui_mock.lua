@@ -86,13 +86,26 @@ Timer = function(t)
            start = function(self) self.running = true; self.ontick() end, stop = function(self) self.running = false end }
 end
 
-local function set(id, v)
+local function setRaw(id, v)
   local w = widgets[id]
   w.value = v
   local cb = w.t.onchange or w.t.onclick
   if cb then cb() end
 end
-local function click(id) widgets[id].t.onclick() end
+
+-- No tabs: a control is only usable if some section shows it. Switch to that section first,
+-- and fail when no section does.
+local function reach(id)
+  if not NOTABS or id == "section" or widgets[id].visible ~= false then return end
+  for _, name in ipairs(widgets.section.options) do
+    setRaw("section", name)
+    if widgets[id].visible then return end
+  end
+  check(false, "no tabs: " .. id .. " is reachable through the section picker")
+end
+
+local function set(id, v) reach(id); setRaw(id, v) end
+local function click(id) reach(id); widgets[id].t.onclick() end
 
 -- Fake graphics context
 local function fakeGC(w, h)
@@ -118,6 +131,10 @@ tag.name = "idle"
 local ok, err = pcall(M.UI.open)
 check(ok, "dialog opens " .. tostring(err or ""))
 if not ok then error(err) end
+-- Visibility right after opening, before any interaction switches section.
+local openedMotionOnly = widgets.clip.visible and not (widgets.param1.visible or widgets.travel.visible
+  or widgets.preset.visible or widgets.fit.visible or widgets.style.visible or widgets.c1.visible
+  or widgets.ease.visible)
 
 check(widgets.height.value == 40 and widgets.groundY.value == 59, "auto-fit on first open")
 -- (in picker mode the sliders sit in the Clip section, checked below)
@@ -165,9 +182,31 @@ if NOTABS then
   check(widgets.section ~= nil and widgets.tabMotion == nil, "no tabs: section picker instead of tabs")
   local opts = table.concat(widgets.section.options, ",")
   check(opts == "Motion,Clip,Travel,Body,Place,Look,Colors,Pose", "no tabs: one short section per part (" .. opts .. ")")
-  check(widgets.clip.visible and not widgets.param1.visible and not widgets.travel.visible
-        and not widgets.c1.visible and not widgets.style.visible,
-        "no tabs: only the Motion section is shown")
+  check(openedMotionOnly, "no tabs: the dialog opens on the Motion section only")
+  -- Every section shows exactly its own controls.
+  local SECTIONS = {
+    Motion = { "clip", "scope", "frames", "fps", "fillAll", "timing", "labels" },
+    Clip = { "param1", "param2", "param3", "param4", "param5" },
+    Travel = { "travel", "travelSpeed", "footprints", "groundLine" },
+    Body = { "preset", "pHead", "pTorso", "pArms", "pLegs", "pBulk", "facing" },
+    Place = { "fit", "height", "groundY", "cx" },
+    Look = { "style", "thickness", "pixelPerfect", "opacity", "showArt" },
+    Colors = { "colorScheme", "c1", "resetColors" },
+    Pose = { "help", "help2", "segment", "ease", "dirtyInfo", "clipName", "saveClip", "revert" },
+  }
+  for _, name in ipairs(widgets.section.options) do
+    setRaw("section", name)
+    local okSection = true
+    for other, ids in pairs(SECTIONS) do
+      for _, id in ipairs(ids) do
+        if (widgets[id].visible == true) ~= (other == name) then okSection = false end
+      end
+    end
+    check(okSection, "no tabs: section " .. name .. " shows its own controls and hides the rest")
+  end
+  -- Controls outside the sections stay visible whatever section is shown.
+  check(widgets.frame.visible and widgets.apply.visible and widgets.preview.visible,
+        "no tabs: preview, transport and Apply stay visible")
   set("section", "Clip")
   check(widgets.param1.visible and widgets.param5.visible and not widgets.param6.visible and not widgets.clip.visible,
         "no tabs: Clip shows this clip's param sliders only")

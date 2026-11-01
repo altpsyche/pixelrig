@@ -563,6 +563,8 @@ return function(M)
     W:combobox { id = "style", label = "Style", option = S.style, options = Render.STYLES, onchange = changed }
     W:slider { id = "thickness", label = "Line px", min = 1, max = 8, value = S.thickness, onchange = changed }
     W:check { id = "pixelPerfect", text = "Pixel-perfect 1px lines", selected = S.pixelPerfect, onclick = changed }
+    W:slider { id = "opacity", label = "Opacity %", min = 5, max = 100, value = S.opacity, onchange = changed }
+    W:check { id = "showArt", text = "Show art in preview", selected = S.showArt ~= false, onclick = changed }
     sec:begin("secColors")
     W:combobox { id = "colorScheme", label = "Colors", option = S.colorScheme, options = M.Colors.SCHEMES, onchange = onSchemeChange }
     for i = 1, M.Colors.MAX_SLOTS do
@@ -573,8 +575,6 @@ return function(M)
       refreshColors()
       changed()
     end }
-    W:slider { id = "opacity", label = "Opacity %", min = 5, max = 100, value = S.opacity, onchange = changed }
-    W:check { id = "showArt", text = "Show art in preview", selected = S.showArt ~= false, onclick = changed }
 
     sec:begin("secPose")
     W:label { id = "help", label = "Edit", text = "Pause, drag joints in preview." }
