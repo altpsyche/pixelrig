@@ -387,5 +387,26 @@ click("remove")
 check(M.Ghost.findLayer(spr, M.Ghost.ALL) == nil, "remove ghost")
 click("close")
 
+-- The dialog's sprite closed (#3): Apply says so, auto-apply stays silent.
+do
+  for k in pairs(widgets) do widgets[k] = nil end
+  local gone = Sprite(32, 32, ColorMode.RGB)
+  app.sprite = gone
+  M.UI.open()
+  gone:close()
+  app.sprite = spr
+  local alerts = {}
+  rawset(app, "alert", function(t) table.insert(alerts, type(t) == "table" and t.text or t) end)
+  set("autoApply", true)
+  set("ease", "Ease in")
+  local autoAlerts = #alerts
+  click("apply")
+  rawset(app, "alert", nil)
+  check(autoAlerts == 0, "auto-apply on a closed sprite stays silent (" .. autoAlerts .. " alerts)")
+  check(#alerts == 1 and tostring(alerts[1]):find("is closed", 1, true) ~= nil,
+        "apply on a closed sprite says so: " .. tostring(alerts[1]))
+  click("close")
+end
+
 print((NOTABS and "[no tabs] " or "[tabs] ") .. (failures == 0 and "ALL PASSED" or (failures .. " FAILED")))
 if failures > 0 then error(failures .. " test(s) failed") end
