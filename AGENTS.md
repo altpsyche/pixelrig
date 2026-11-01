@@ -18,8 +18,9 @@ data (a clip file), not code. Mirror these in `docs/workflow.md` § The constitu
 > ticket → follow [`.agents/skills/work/SKILL.md`](.agents/skills/work/SKILL.md).
 > **Skills:** `/name` anywhere in this repo means read `.agents/skills/name/SKILL.md` and follow it.
 > Every agent reads the file, whatever its harness does with the folder.
-> **State:** Phase 0 and Phase 1 have landed: Ghost Reference shipped as `v0.0.1-alpha`.
-> [`docs/idea.md`](docs/idea.md) is the source of truth for what comes next.
+> **State:** Phase 0 has landed. Phase 1 is open: Ghost Reference shipped as `v0.0.1-alpha`, and
+> confirming its dialog in the real Aseprite UI remains. [`docs/idea.md`](docs/idea.md) is the
+> source of truth for what comes next.
 
 ## Where things live
 
@@ -31,7 +32,7 @@ data (a clip file), not code. Mirror these in `docs/workflow.md` § The constitu
 | How a part works — the HOW | a co-located `.md` beside the work it describes; the extension's module map is in [`README.md`](README.md) § Layout |
 | Vocabulary | `GLOSSARY.md`, created lazily by `/domain-modeling`. Until it exists, `docs/idea.md` § Core Concepts is the authority |
 | Issues, PR state | **GitHub issues** — see [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md) |
-| Roadmap checklist | [`TODO.md`](TODO.md), mirrored by `docs/idea.md` § Roadmap; the idea wins |
+| Working checklist | [`TODO.md`](TODO.md), including later ideas not yet on the roadmap; `docs/idea.md` § Roadmap is authoritative and wins |
 | Local scratch, never authoritative | `.scratch/` (gitignored) |
 | Skills | [`.agents/skills/README.md`](.agents/skills/README.md) |
 | Skill evals | [`evals/README.md`](evals/README.md); when a PR runs them: `docs/workflow.md` § 2 |

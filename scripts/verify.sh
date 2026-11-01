@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Everything CI runs. Phase 0 appends the project's own checks at the end.
+# Everything CI runs. PixelRig's own checks live in tools/check.sh, called at the end.
 #
 #   scripts/verify.sh
 set -euo pipefail
