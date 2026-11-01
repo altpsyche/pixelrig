@@ -219,10 +219,20 @@ do
     if repaints > r0 then edits = edits + 1 end
   end
   widgets.preview.t.onmouseup({ x = spot.x + 2 * MOVES, y = spot.y + MOVES })
-  M.Ghost.renderFrame, M.Ghost.composite = renderFrame, composite
   check(edits == MOVES and renders == MOVES and composites == 0, string.format(
     "a %d-move joint drag renders one ghost frame per move and keeps the art (%d edits, %d frames, %d composites)",
     MOVES, edits, renders, composites))
+  -- Auto-apply on release writes only the ghost, a reference layer: the art composite is kept.
+  setRaw("autoApply", true)
+  composites = 0
+  widgets.preview.t.onmousedown({ x = spot.x + 2 * MOVES, y = spot.y + MOVES, button = MouseButton.LEFT })
+  widgets.preview.t.onmousemove({ x = spot.x, y = spot.y })
+  widgets.preview.t.onmouseup({ x = spot.x, y = spot.y })
+  widgets.preview.t.onpaint({ context = fakeGC(280, 220) })
+  setRaw("autoApply", false)
+  M.Ghost.renderFrame, M.Ghost.composite = renderFrame, composite
+  check(M.Ghost.findLayer(spr, M.Ghost.ALL) ~= nil and composites == 0,
+        "auto-apply after a drag keeps the art composite (" .. composites .. " composites)")
 end
 
 -- easing

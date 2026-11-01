@@ -259,7 +259,8 @@ return function(M)
       S.clipData = dirty and Clip.export(work) or nil
       local err = Ghost.apply(sprite, S, work, lib.rigs[work.rig])
       if err then app.alert(err) end
-      bgCache = {}
+      -- The art composites are kept: Apply writes only the ghost, a reference layer the composite
+      -- leaves out, and frames it adds come after every frame composited so far (#8).
       refreshFit()
     end
 
