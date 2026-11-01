@@ -4,6 +4,7 @@
   "description": "Rigging, motion reference and animation tools for pixel art.",
   "version": "0.1.0",
   "author": { "name": "Siva" },
+  "license": "MIT",
   "categories": [ "Scripts" ],
   "contributes": {
     "scripts": [
