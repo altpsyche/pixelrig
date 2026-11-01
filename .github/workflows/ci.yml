@@ -5,7 +5,10 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  workflow_call: # .github/workflows/release.yml runs these checks on a tag before it publishes
 
+# Called from release.yml, github.workflow is "Release", so this group is the caller's own name and
+# tag; release.yml must not set a concurrency group of that shape or the run waits on itself.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -20,8 +23,8 @@ jobs:
   # frontier query tests and the Jev tools' tests against a fake server (plain Node, no packages,
   # plus the runner's jq for the query tests and the stubs; no TYPESAFE_API_KEY: Jev never runs in
   # CI, ADR-0002), the gitleaks secret scan, and PixelRig's checks: Lua syntax (luac5.4), clip and
-  # rig JSON, and the release archive. The Aseprite batch tests need a binary CI does not have; they
-  # run locally (AGENTS.md § Verifying your work).
+  # rig JSON, the release gate's test and notes, and the release archive. The Aseprite batch tests
+  # need a binary CI does not have; they run locally (AGENTS.md § Verifying your work).
   # Update AGENTS.md § Verifying your work in the same commit.
   verify:
     runs-on: ubuntu-latest

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # PixelRig's project checks, run by scripts/verify.sh (and so by CI and the pre-push hook).
-#   tools/check.sh                       Lua syntax, clip/rig JSON, release archive
+#   tools/check.sh                       Lua syntax, clip/rig JSON, release gate, release archive
 #   ASEPRITE=/path/to/aseprite tools/check.sh   plus the Aseprite batch tests
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -20,6 +20,14 @@ if command -v node >/dev/null; then
       try { JSON.parse(fs.readFileSync(f, "utf8")); }
       catch (e) { console.error(`verify: ${f}: ${e.message}`); process.exit(1); }
     }' clips/*.json rigs/*.json
+fi
+
+# Release gate (tools/release-check.sh), which the Release workflow runs before it publishes: its
+# own test, and every release's notes in docs/releases/ checked against their tag.
+if command -v node >/dev/null && command -v git >/dev/null; then
+  node --test tools/release-check.test.mjs
+else
+  echo "verify: node or git not found, release gate test skipped (CI runs it)" >&2
 fi
 
 # Release archive: package.json at its root, only the extension inside (tools/check-archive.sh).
