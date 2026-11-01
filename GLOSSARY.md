@@ -24,7 +24,7 @@ _Avoid_: keyframe (ambiguous with Aseprite frames)
 
 **Key pose**:
 A named moment of a whole clip (`contact`, `pass`) that owns the spacing (ease) until the next key
-pose; it becomes a one-frame tag.
+pose.
 _Avoid_: mark, keyframe
 
 **Param**:
@@ -50,7 +50,7 @@ The rendered guide figure, drawn over the artist's art.
 _Avoid_: onion skin, reference image
 
 **Ghost layer**:
-The reference layer that holds a ghost. PixelRig owns it, and it is never exported.
+The layer PixelRig owns that holds a ghost.
 
 **Range**:
 Where a PixelRig tool works: all frames, or one tag. One ghost layer per range.
@@ -82,8 +82,7 @@ _Avoid_: left / right
 ## Timing
 
 **Drawing**:
-One Aseprite frame of the artist's animation, as the exposure sheet sees it. Every frame is one
-drawing; PixelRig never merges or splits them.
+One frame of the artist's animation, as the exposure sheet sees it.
 _Avoid_: cel (that is one layer's image in a frame), keyframe
 
 **Base rate**:
@@ -98,7 +97,7 @@ How many base frames a drawing is held: a whole number, 1 or more. "On 2s" means
 _Avoid_: hold count, frame count
 
 **Off-grid**:
-A drawing whose duration is not a whole number of base frames.
+A drawing whose duration does not fit a whole exposure at the sprite's base rate.
 
 **Hold**:
 An exposure longer than the drawings around it, usually on a key drawing.
@@ -112,5 +111,4 @@ The PixelRig tool that shows and edits each drawing's exposure and drawing role 
 _Avoid_: dope sheet, X-sheet, timeline
 
 **Timing layer**:
-The hidden layer PixelRig owns that holds the drawing roles of a sprite, so that each role stays
-with its drawing.
+The layer PixelRig owns that holds a sprite's drawing roles.
