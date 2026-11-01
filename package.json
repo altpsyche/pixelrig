@@ -2,7 +2,7 @@
   "name": "pixelrig",
   "displayName": "PixelRig",
   "description": "Rigging, motion reference and animation tools for pixel art.",
-  "version": "0.1.0",
+  "version": "0.0.1-alpha",
   "author": { "name": "Siva" },
   "license": "MIT",
   "categories": [ "Scripts" ],

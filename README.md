@@ -4,6 +4,12 @@ Animation toolkit for Aseprite. Guides first: PixelRig generates reference poses
 
 Open source (MIT). Built for solo and indie pixel artists, tuned for characters 32–128px tall. Side view today; the data model leaves room for 4/8 directions.
 
+## Install
+
+Download the latest `.aseprite-extension` from [Releases](../../releases), then double-click it or use **Edit > Preferences > Extensions > Add Extension**. Open a sprite and go to **View > Ghost Reference...**
+
+Tested on a current Aseprite source build (Lua API version 41). Recent 1.3.x releases should work; older ones may lack APIs it uses (dialog tabs, canvas mouse events, layer properties).
+
 ## Status
 
 | Module | State |
@@ -73,7 +79,14 @@ Skeleton proportions live in `rigs/<name>.json`, normalized to standing height.
 ```sh
 tools/dev-install.sh               # link checkout into ~/.config/aseprite/extensions/pixelrig
 tools/test.sh /path/to/aseprite    # headless tests + render sheets in tests/out/
+tools/package.sh                   # build dist/*.aseprite-extension and dist/*.zip
 ```
+
+### Releasing
+
+1. Bump `version` in `package.json` and update `RELEASE_NOTES.md`.
+2. Commit, then tag `v<version>` and push the tag.
+3. The Release workflow checks the tag matches `package.json`, builds both packages and publishes the release (versions with a `-suffix` are marked pre-release).
 
 `tests/headless.lua` covers build, render, travel, easing, pose edits and sprite apply. `tests/ui_mock.lua` drives the dialog through a mock `Dialog` (batch mode has no UI).
 

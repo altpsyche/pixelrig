@@ -1,0 +1,30 @@
+First alpha of PixelRig, a guides-first animation toolkit for Aseprite.
+
+## Install
+
+1. Download `pixelrig-v0.0.1-alpha.aseprite-extension` below.
+2. Double-click it, or in Aseprite: **Edit > Preferences > Extensions > Add Extension** and pick the file.
+3. Open a sprite, then **View > Ghost Reference...**
+
+The `.zip` has the same contents if you prefer to unpack it into your extensions folder by hand.
+
+Tested on a current Aseprite source build (Lua API version 41). Recent 1.3.x releases should work; older ones may lack APIs it uses (dialog tabs, canvas mouse events, layer properties).
+
+## What's in it: Ghost Reference
+
+Generates a side-view pose ghost on a reference layer (never exported) for every frame of a motion cycle. You draw the final pixels over it.
+
+- Animated preview over your art; **Apply** writes one undo step
+- Run cycle (12 frames) with stride, knee drive, bounce, lean, arm swing sliders
+- Range: all frames or any tag, one ghost layer per range
+- Fit to art, body presets (Default, Heroic, Chibi, Stocky) and proportion sliders
+- Styles: Stick, Capsule, Joints + arcs; color schemes with per-part pickers
+- Drag joints in the preview to edit poses, set spacing per key pose, save your own clips
+- Travel mode with planted-foot lock, footprints and ground line
+- Settings and edits are saved on the ghost layer and restored on reopen
+
+## Known limits
+
+- Alpha: only the Run clip ships; walk, idle, jump, attack and hurt come next
+- Side view and humanoid only
+- Dialog logic is tested headless through a mock dialog; please report UI issues
