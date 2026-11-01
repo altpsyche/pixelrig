@@ -85,10 +85,14 @@ return function(M)
       s.scope = scope
       if not lib.clips[s.clip] then s.clip = lib.names[1] end
       S = s
-      if S.clipData then
-        work = Clip.fromData(Util.deepCopy(S.clipData), "layer")
+      -- An edited clip kept with the ghost that no longer loads is dropped for the library clip.
+      local ok, edited = false, nil
+      if S.clipData then ok, edited = pcall(Clip.fromData, Util.deepCopy(S.clipData), "layer") end
+      if ok and lib.rigs[edited.rig] then
+        work = edited
         dirty = true
       else
+        S.clipData = nil
         work = Clip.clone(lib.clips[S.clip])
         dirty = false
       end

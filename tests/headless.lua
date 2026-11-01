@@ -207,6 +207,15 @@ do
   local loaded = Ghost.loadSettings(layer)
   check(loaded and loaded.height == 30 and loaded.cx == 32, "settings persisted on layer")
 
+  -- Corrupt settings: anything that does not decode to an object is ignored (#4).
+  local good = layer.properties("pixelrig").settings
+  for _, text in ipairs({ "42", '"text"', "true", "null", "[1, 2]", "{ not json" }) do
+    layer.properties("pixelrig").settings = text
+    local ok, got = pcall(Ghost.loadSettings, layer)
+    check(ok and got == nil, "settings " .. text .. " ignored (" .. tostring(ok and got or got) .. ")")
+  end
+  layer.properties("pixelrig").settings = good
+
   -- re-apply does not duplicate layers/tags
   Ghost.apply(spr, s, lib.clips.Run, rig)
   local ghosts, tags = 0, #spr.tags

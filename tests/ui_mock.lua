@@ -283,6 +283,24 @@ M.UI.open()
 check(widgets.style.value == "Joints + arcs" and widgets.colorScheme.value == "Segments", "reopen restores settings")
 check(not widgets.skipped.visible, "no skipped line when every clip loads")
 
+-- Corrupt settings on the ghost layer: the dialog still opens, with defaults (#4).
+local function reopenWith(text)
+  layer.properties("pixelrig").settings = text
+  click("close")
+  for k in pairs(widgets) do widgets[k] = nil end
+  app.layer = layer
+  local opened, why = pcall(M.UI.open)
+  return opened, why
+end
+for _, text in ipairs({ "[1, 2]", "42", "null" }) do
+  local opened, why = reopenWith(text)
+  check(opened and widgets.style.value == M.Ghost.DEFAULTS.style and widgets.clip.value == "Run",
+        "corrupt settings " .. text .. " -> opens with defaults " .. tostring(why or ""))
+end
+local opened, why = reopenWith(json.encode({ style = "Capsule", clip = "Run", clipData = { name = "Run" } }))
+check(opened and widgets.style.value == "Capsule" and widgets.dirtyInfo.value == "Clip unchanged",
+      "corrupt edited clip in settings -> library clip " .. tostring(why or ""))
+
 click("remove")
 check(M.Ghost.findLayer(spr, M.Ghost.ALL) == nil, "remove ghost")
 click("close")
