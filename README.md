@@ -91,7 +91,7 @@ roadmap.
 scripts/install-hooks.sh                       # once per clone: pre-push runs verify.sh
 ASEPRITE=/path/to/aseprite scripts/verify.sh   # everything CI runs, plus the Aseprite tests
 tools/dev-install.sh               # link checkout into ~/.config/aseprite/extensions/pixelrig
-tools/test.sh /path/to/aseprite    # headless tests + render sheets in tests/out/
+tools/test.sh /path/to/aseprite    # every Aseprite suite, then fails if any did; sheets in tests/out/
 tools/package.sh                   # build dist/*.aseprite-extension and dist/*.zip
 ```
 
@@ -104,6 +104,6 @@ tools/package.sh                   # build dist/*.aseprite-extension and dist/*.
 
 Every notes file in `docs/releases/` is checked against its own tag by `scripts/verify.sh`, so a wrong heading or a stale version fails in the PR, before any tag.
 
-`tests/headless.lua` covers build, render, travel, easing, pose edits and sprite apply. `tests/ui_mock.lua` drives the dialog through a mock `Dialog` (batch mode has no UI), once with tabs and once without, as on Aseprite v1.3-rc6.
+`tests/pure.lua` runs under plain Lua 5.4 (`lua5.4 tests/pure.lua`, `-v` lists each check), so CI runs it: clip sampling, easing and key edits, rig solving and grounding, stamps, colors, and render output through a put callback. `tests/headless.lua` covers build, render, travel, easing, pose edits and sprite apply. `tests/ui_mock.lua` drives the dialog through a mock `Dialog` (batch mode has no UI), once with tabs and once without, as on Aseprite v1.3-rc6.
 
 Aseprite ignores symlinked extension directories, so `dev-install.sh` makes a real directory of per-file symlinks. Rerun it after adding top-level files.

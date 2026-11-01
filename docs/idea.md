@@ -59,7 +59,8 @@ A single Lua extension; the repo root is the extension. Modules, each in one fil
 
 Settings and edited clips persist in the ghost layer's `properties("pixelrig")`. Tests run in
 Aseprite batch mode: `tests/headless.lua` for build, render and apply, `tests/ui_mock.lua` for the
-dialog through a mock `Dialog`.
+dialog through a mock `Dialog`. `tests/pure.lua` tests the modules that need no Aseprite under
+plain Lua 5.4, so CI runs it.
 
 ## 6. Roadmap
 
