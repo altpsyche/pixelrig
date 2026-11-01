@@ -2,7 +2,7 @@
 local root = app.params.root
 local out = app.params.out
 local M = dofile(root .. "/modules.lua")(root)
-local Clip, Rig, Ghost, Util, Render = M.Clip, M.Rig, M.Ghost, M.Util, M.Render
+local Clip, Rig, Ghost, Util, Render, Colors = M.Clip, M.Rig, M.Ghost, M.Util, M.Render, M.Colors
 
 local failures = 0
 local function check(cond, msg)
@@ -350,10 +350,99 @@ do
   other:close()
 end
 
+-- The ghost is visible on indexed and grayscale sprites (#5): every pixel the RGB render draws is
+-- drawn, never in the transparent index, and the artist's palette is left as it was.
 do
+  local function count(img, visible)
+    local n = 0
+    if img then
+      for it in img:pixels() do
+        if visible(it()) then n = n + 1 end
+      end
+    end
+    return n
+  end
+
+  local function ghostImage(spr)
+    local layer = Ghost.findLayer(spr, Ghost.ALL)
+    local cel = layer and layer:cel(1)
+    return cel and cel.image
+  end
+
+  -- Pixels the ghost draws in RGB for settings s, and how many of them are color rgb.
+  local function reference(s, rgb)
+    local img = Image(48, 48, ColorMode.RGB)
+    img:clear()
+    Ghost.renderFrame(img, Ghost.build(s, lib.clips.Run, rig), 1, s, Ghost.pixelConverter(ColorMode.RGB))
+    local exact = rgb and app.pixelColor.rgba(rgb[1], rgb[2], rgb[3], 255)
+    return count(img, function(v) return app.pixelColor.rgbaA(v) > 0 end), count(img, function(v) return v == exact end)
+  end
+
+  local function setRgb(pal, i, c) pal:setColor(i, Color { r = c[1], g = c[2], b = c[3], a = 255 }) end
+
+  local function schemeColor(scheme, part, side)
+    return Colors.resolver(scheme, Colors.resolve(scheme))(part, side)
+  end
+
+  -- The palette entry at the transparent index is exactly one color the ghost draws, so before the
+  -- fix that color's pixels came out transparent. Each path that turns a color into a pixel is
+  -- covered: a scheme's near color, Mono's auto-darkened far color, a custom scheme pick, and the
+  -- motion arc, footprint and ground line colors (Joints + arcs, travel, ground line on).
+  local CUSTOM = { 200, 40, 120 }
+  local extras = { style = "Joints + arcs", travel = true, footprints = true, groundLine = true }
+  for _, case in ipairs({
+    { name = "Near / Far near color", transparent = 0, over = { colorScheme = "Near / Far" },
+      rgb = schemeColor("Near / Far", "torso", "near") },
+    { name = "Mono darkened far color", transparent = 2, over = { colorScheme = "Mono" },
+      rgb = schemeColor("Mono", "torso", "far") },
+    { name = "custom scheme color", transparent = 0,
+      over = { colorScheme = "Limbs", schemeColors = { ["Limbs"] = { legNear = CUSTOM } } }, rgb = CUSTOM },
+    { name = "arc color", transparent = 0, over = extras, rgb = Colors.ARC },
+    { name = "footprint color", transparent = 0, over = extras, rgb = Colors.FOOTPRINT },
+    { name = "ground line color", transparent = 3, over = extras, rgb = Colors.GROUND },
+  }) do
+    local over = { height = 40, groundY = 46, cx = 24, frames = 4 }
+    for k, v in pairs(case.over) do over[k] = v end
+    local s = settings(over)
+    local want, ofColor = reference(s, case.rgb)
+    local label = "indexed, " .. case.name .. " at transparent index " .. case.transparent
+    check(ofColor > 0, label .. ": the ghost draws that color (" .. ofColor .. " pixels)")
+    local spr = Sprite(48, 48, ColorMode.INDEXED)
+    spr.transparentColor = case.transparent
+    local pal = spr.palettes[1]
+    setRgb(pal, case.transparent, case.rgb)
+    local size, before = #pal, {}
+    for i = 0, size - 1 do before[i] = pal:getColor(i).rgbaPixel end
+    check(Ghost.apply(spr, s, lib.clips.Run, rig) == nil, label .. ": apply")
+    local drawn = count(ghostImage(spr), function(v) return v ~= case.transparent end)
+    check(want > 0 and drawn == want,
+          label .. ": every ghost pixel is visible, none in the transparent index (" .. drawn .. " of " .. want .. ")")
+    local same = #spr.palettes[1] == size
+    for i = 0, size - 1 do
+      if spr.palettes[1]:getColor(i).rgbaPixel ~= before[i] then same = false end
+    end
+    check(same, label .. ": apply leaves the sprite palette unchanged")
+    spr:close()
+  end
+
+  local s = settings { height = 40, groundY = 46, cx = 24, frames = 4 }
+  local want = reference(s)
+
+  -- A palette holding only the transparent entry has nothing visible to draw with: Apply writes
+  -- nothing and returns a one-line note saying why, instead of an empty ghost (owner ruling, #50).
   local spr = Sprite(48, 48, ColorMode.INDEXED)
-  local s = settings { height = 40, groundY = 46, cx = 24 }
-  check(Ghost.apply(spr, s, lib.clips.Run, rig) == nil, "apply on indexed sprite")
+  spr.palettes[1]:resize(1)
+  local note = Ghost.apply(spr, s, lib.clips.Run, rig)
+  check(type(note) == "string" and note:find("no visible color", 1, true) ~= nil and not note:find("\n", 1, true),
+        "indexed: a palette with only the transparent entry returns a one-line note: " .. tostring(note))
+  check(Ghost.findLayer(spr, Ghost.ALL) == nil and #spr.layers == 1 and #spr.palettes[1] == 1,
+        "indexed: that apply writes no ghost layer and leaves the palette unchanged")
+  spr:close()
+
+  spr = Sprite(48, 48, ColorMode.GRAY)
+  check(Ghost.apply(spr, s, lib.clips.Run, rig) == nil, "apply on grayscale sprite")
+  local drawn = count(ghostImage(spr), function(v) return app.pixelColor.grayaA(v) > 0 end)
+  check(want > 0 and drawn == want, "grayscale: every ghost pixel is visible (" .. drawn .. " of " .. want .. ")")
   spr:close()
 end
 
