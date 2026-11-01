@@ -331,10 +331,10 @@ return function(Clip, Rig, Render, Colors, Util)
       if add > 0 then
         -- newEmptyFrame grows a tag that ends on the last frame; the artist's tags keep their range.
         local ends = {}
-        for _, tag in ipairs(sprite.tags) do table.insert(ends, { tag, tag.toFrame.frameNumber }) end
+        for _, tag in ipairs(sprite.tags) do table.insert(ends, { tag = tag, to = tag.toFrame.frameNumber }) end
         for _ = 1, add do sprite:newEmptyFrame(#sprite.frames + 1) end
         for _, e in ipairs(ends) do
-          if e[1].toFrame.frameNumber ~= e[2] then e[1].toFrame = e[2] end
+          if e.tag.toFrame.frameNumber ~= e.to then e.tag.toFrame = e.to end
         end
         last = last + add
       end
