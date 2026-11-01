@@ -262,6 +262,32 @@ check(layer ~= nil, "apply creates ghost layer")
 local saved = M.Ghost.loadSettings(layer)
 check(saved and saved.clipData ~= nil and saved.style == "Joints + arcs", "edited clip + settings saved on layer")
 
+-- Another sprite active, its own layer and frame 3 (#3): Fit measures only the dialog's sprite,
+-- and Apply writes the dialog's sprite without leaving the artist on it.
+local other = Sprite(32, 32, ColorMode.RGB)
+other:newEmptyFrame(2); other:newEmptyFrame(3)
+local otherLayer = other.layers[1]
+local otherImg = Image(32, 32, ColorMode.RGB)
+for y = 2, 31 do for x = 0, 31 do otherImg:drawPixel(x, y, app.pixelColor.rgba(20, 200, 20, 255)) end end
+other:newCel(otherLayer, 3, otherImg, Point(0, 0))
+app.sprite = other; app.layer = otherLayer; app.frame = 3
+local function otherActive()
+  return app.sprite == other and app.layer == otherLayer and app.frame and app.frame.frameNumber == 3
+end
+set("height", 48)
+click("fit")
+check(widgets.height.value == 40 and widgets.groundY.value == 59 and widgets.cx.value == 32 and otherActive(),
+      "fit with another sprite's layer and frame active measures the dialog's sprite (" ..
+      widgets.height.value .. "px, ground " .. widgets.groundY.value .. ", cx " .. widgets.cx.value .. ")")
+local framesBefore = #spr.frames
+click("apply")
+local applied = M.Ghost.loadSettings(M.Ghost.findLayer(spr, M.Ghost.ALL))
+check(applied and applied.height == 40 and #other.layers == 1 and #other.frames == 3 and #spr.frames == framesBefore,
+      "apply with another sprite active writes the dialog's sprite only")
+check(otherActive(), "apply with another sprite active leaves that sprite, layer and frame active")
+app.sprite = spr
+other:close()
+
 -- save clip
 set("clipName", "Run test")
 click("saveClip")

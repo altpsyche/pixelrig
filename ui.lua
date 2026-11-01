@@ -52,9 +52,12 @@ return function(M)
       return pcall(function() return sprite.width end)
     end
 
-    -- Fit to art for this dialog's sprite at the current frame (Ghost.fitToArt), or nil.
+    -- Fit to art for this dialog's sprite (Ghost.fitToArt), or nil. It measures the active frame
+    -- only when that frame is this sprite's; another open sprite may be active (#3).
     local function fitArt()
-      return Ghost.fitToArt(sprite, app.frame and app.frame.frameNumber or 1)
+      local f = app.frame
+      local own = app.sprite == sprite and f
+      return Ghost.fitToArt(sprite, own and f.frameNumber or 1)
     end
 
     local function defaultsFor(scope)
@@ -194,12 +197,13 @@ return function(M)
       dlg:repaint()
     end
 
+    -- Ghost.apply writes this dialog's sprite and leaves the artist's active sprite, layer and
+    -- frame as they were (#3).
     local function applyNow()
       if not alive() then return end
       pull()
       S.clip = work.name
       S.clipData = dirty and Clip.export(work) or nil
-      if app.sprite ~= sprite then app.sprite = sprite end
       local err = Ghost.apply(sprite, S, work, lib.rigs[work.rig])
       if err then app.alert(err) end
       bgCache = {}
