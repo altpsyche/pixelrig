@@ -7,7 +7,7 @@ Target sprite heights: 32–128px. Side view first; data model must allow 4/8 di
 - [x] Ghost Reference polish: remembered settings, dialog preview + Apply, fit to art, tag-scoped ghosts,
       no jitter, pixel-perfect lines, head stamps, per-side/limb/segment colors, proportions + presets,
       pose dragging + save clip, travel with foot lock + footprints, per-key-pose easing
-- [ ] Verify Ghost Reference dialog in the real Aseprite UI (tests use a mock Dialog)
+- [x] Verify Ghost Reference dialog in the real Aseprite UI (owner, #16)
 
 ## Next
 - [ ] More ghost clips: walk, idle, jump, attack, hurt

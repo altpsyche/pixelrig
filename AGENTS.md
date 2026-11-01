@@ -18,9 +18,9 @@ data (a clip file), not code. Mirror these in `docs/workflow.md` § The constitu
 > ticket → follow [`.agents/skills/work/SKILL.md`](.agents/skills/work/SKILL.md).
 > **Skills:** `/name` anywhere in this repo means read `.agents/skills/name/SKILL.md` and follow it.
 > Every agent reads the file, whatever its harness does with the folder.
-> **State:** Phase 0 has landed. Phase 1 is open: Ghost Reference shipped as `v0.0.1-alpha`, and
-> confirming its dialog in the real Aseprite UI remains. [`docs/idea.md`](docs/idea.md) is the
-> source of truth for what comes next.
+> **State:** Phase 0 has landed. Phase 1 is open: Ghost Reference shipped as `v0.0.1-alpha` and
+> the owner checked its dialog in Aseprite (#16); its bug tickets remain.
+> [`docs/idea.md`](docs/idea.md) is the source of truth for what comes next.
 
 ## Where things live
 
