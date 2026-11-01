@@ -92,13 +92,21 @@ has confirmed the spec's testing seams.
 8. Evals, so a skill change is proven like code: when the diff touches `.agents/skills/<name>/`,
    run every case in `evals/<name>/`; when it touches `AGENTS.md`, every case in `evals/`, unless
    it changes only the list of checks in `AGENTS.md` § Verifying your work: the text from
-   `It checks` up to, not including, the sentence that starts `CI has no Aseprite`. It does when
-   `git -C <worktree> diff --word-diff <base>...HEAD -- AGENTS.md`, with `<base>` the PR's base
-   (`origin/main`, or a sub-PR's per § 3), marks no word outside that list; text only rewrapped
-   is not marked. Run each, and have another session grade it, per
+   `It checks` up to, not including, the sentence that starts `CI has no Aseprite`. Two tests
+   decide it, both read from `git -C <worktree> diff --word-diff <base>...HEAD -- AGENTS.md`, with
+   `<base>` the PR's base (`origin/main`, or a sub-PR's per § 3), which does not mark text only
+   rewrapped:
+   - **Position**: it marks no word outside that list.
+   - **Content**: the marked words only describe what a check covers: its name, the files or
+     commands it runs, what it tests. A word that tells an agent what to do or not do, such as
+     "skip", "do not", "must" or "optional", is a rule, not a description.
+
+   The exception needs both. The Reviewer judges them from that output, and any doubt means the
+   cases run. Run each, and have another session grade it, per
    [`evals/README.md`](../evals/README.md). A skill with no folder in `evals/` has no case to run.
    A grade holds for the commit it ran on: a later commit to those paths, in a fix round too,
-   needs a fresh run, except one whose only change to them is to that list.
+   needs a fresh run, unless both tests hold for that commit alone, read from
+   `git -C <worktree> diff --word-diff <commit>^ <commit> -- AGENTS.md`.
 9. **Open a PR** whose body, written by `/pr` with its Evidence per **Evidence**, says
    `Closes #<n>`, labelled `status:in-review`. Without that label no Reviewer finds it.
 
