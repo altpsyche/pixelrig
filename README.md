@@ -93,6 +93,7 @@ scripts/install-hooks.sh                       # once per clone: pre-push runs v
 ASEPRITE=/path/to/aseprite scripts/verify.sh   # everything CI runs, plus the Aseprite tests
 tools/dev-install.sh               # link checkout into ~/.config/aseprite/extensions/pixelrig
 tools/test.sh /path/to/aseprite    # every Aseprite suite, then fails if any did; sheets in tests/out/
+aseprite -b --script-param root=$PWD --script tests/bench_preview.lua  # preview timings, 1024x1024 (#8)
 tools/package.sh                   # build dist/*.aseprite-extension and dist/*.zip
 ```
 
