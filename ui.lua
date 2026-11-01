@@ -75,7 +75,7 @@ return function(M)
     local function defaultsFor(scope)
       local s = Util.deepCopy(Ghost.DEFAULTS)
       s.scope = scope
-      s.height = max(8, floor(sprite.height * 0.8))
+      s.height = floor(sprite.height * 0.8) -- loadScope clamps it to the Height slider (#44)
       s.groundY = sprite.height - 1
       s.cx = sprite.width // 2
       local fit = fitArt()
@@ -90,6 +90,8 @@ return function(M)
     local function loadScope(scope)
       local s = Ghost.loadSettings(Ghost.findLayer(sprite, scope))
       if not s then s = defaultsFor(scope) end
+      -- Saved values may lie outside the sliders, as after the canvas shrank (#44).
+      Ghost.clampPlace(s, sprite)
       s.scope = scope
       if not lib.clips[s.clip] then s.clip = lib.names[1] end
       S = s
@@ -413,11 +415,18 @@ return function(M)
       end
     end
 
+    -- Sets the Place sliders to v.height, v.groundY and v.cx, already clamped by Ghost, with their
+    -- ranges renewed first: the canvas may have changed size since the dialog opened (#44).
+    local function setPlace(v)
+      for id, r in pairs(Ghost.placeLimits(sprite)) do
+        dlg:modify { id = id, min = r.min, max = r.max, value = v[id] }
+      end
+    end
+
     local function pushAll()
       local p = S.proportions
       local values = {
         style = S.style, facing = S.facing, thickness = S.thickness, pixelPerfect = S.pixelPerfect,
-        height = S.height, groundY = S.groundY, cx = S.cx,
         frames = S.frames, fps = S.fps, timing = S.timing, fillAll = S.fillAll, labels = S.labels,
         addFrames = S.addFrames,
         colorScheme = S.colorScheme, opacity = S.opacity,
@@ -430,6 +439,7 @@ return function(M)
         else dlg:modify { id = id, value = v } end
       end
       dlg:modify { id = "preset", option = S.preset or "Custom" }
+      setPlace(S)
       refreshColors()
       dlg:modify { id = "clip", options = lib.names, option = work.name }
       dlg:modify { id = "clipName", text = work.name .. " custom" }
@@ -517,9 +527,7 @@ return function(M)
         app.alert("No art found: select an area or draw on a layer first.")
         return
       end
-      dlg:modify { id = "height", value = fit.height }
-      dlg:modify { id = "groundY", value = fit.groundY }
-      dlg:modify { id = "cx", value = fit.cx }
+      setPlace(fit)
       changed()
     end
 
@@ -647,10 +655,11 @@ return function(M)
     W:combobox { id = "facing", label = "Facing", option = S.facing, options = { "Right", "Left" }, onchange = changed }
 
     sec:begin("secPlace")
+    local lim = Ghost.placeLimits(sprite)
     W:button { id = "fit", text = "Fit to art (selection, else all visible art)", onclick = onFit }
-    W:slider { id = "height", label = "Height px", min = 8, max = max(16, sprite.height * 2), value = S.height, onchange = changed }
-    W:slider { id = "groundY", label = "Ground Y", min = 0, max = sprite.height - 1, value = S.groundY, onchange = changed }
-    W:slider { id = "cx", label = "Center X", min = 0, max = sprite.width, value = S.cx, onchange = changed }
+    W:slider { id = "height", label = "Height px", min = lim.height.min, max = lim.height.max, value = S.height, onchange = changed }
+    W:slider { id = "groundY", label = "Ground Y", min = lim.groundY.min, max = lim.groundY.max, value = S.groundY, onchange = changed }
+    W:slider { id = "cx", label = "Center X", min = lim.cx.min, max = lim.cx.max, value = S.cx, onchange = changed }
 
     sec:begin("secLook")
     W:combobox { id = "style", label = "Style", option = S.style, options = Render.STYLES, onchange = changed }
