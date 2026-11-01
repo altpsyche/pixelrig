@@ -13,6 +13,7 @@ return function(Clip, Rig, Render, Colors, Util)
     style = "Stick", facing = "Right", thickness = 1, pixelPerfect = true,
     height = 48, groundY = 63, cx = 32,
     frames = 12, fps = 12, timing = false, fillAll = true, labels = true,
+    addFrames = false, -- ADR-0005: Apply adds frames only when the artist turns this on
     colorScheme = "Mono", opacity = 40,
     schemeColors = {}, -- schemeColors[scheme][slotId] = {r, g, b}; missing slots use scheme defaults
     travel = false, travelSpeed = 100, footprints = true, groundLine = false,
@@ -51,6 +52,17 @@ return function(Clip, Rig, Render, Colors, Util)
     local tag = findTag(sprite, scope)
     if not tag then return nil end
     return tag.fromFrame.frameNumber, tag.toFrame.frameNumber
+  end
+
+  -- How much of the cycle Apply places in s.scope: the cycle frames that fit, the cycle length,
+  -- and how many frames Apply adds. Frames are added only on All frames with s.addFrames on
+  -- (ADR-0005); a tag range never grows. Nil if the tag is gone.
+  function Ghost.cycleFit(sprite, s)
+    local first, last = Ghost.scopeRange(sprite, s.scope)
+    if not first then return nil end
+    local N, len = s.frames, last - first + 1
+    local add = (s.scope == Ghost.ALL and s.addFrames) and math.max(0, N - len) or 0
+    return math.min(N, len + add), N, add
   end
 
   function Ghost.isGhost(layer)
@@ -309,16 +321,15 @@ return function(Clip, Rig, Render, Colors, Util)
     if not first then return "Tag '" .. s.scope .. "' not found" end
     local build = Ghost.build(s, clip, baseRig)
     local N = build.N
+    local _, _, add = Ghost.cycleFit(sprite, s)
 
     transactionOn(sprite, "Ghost Reference", function()
       local layer = ensureLayer(sprite, s.scope)
       layer.name = "Ghost: " .. clip.name .. (s.scope ~= Ghost.ALL and (" [" .. s.scope .. "]") or "")
       layer.opacity = math.floor(s.opacity * 255 / 100 + 0.5)
 
-      if s.scope == Ghost.ALL then
-        while #sprite.frames < N do sprite:newEmptyFrame(#sprite.frames + 1) end
-        last = #sprite.frames
-      end
+      for _ = 1, add do sprite:newEmptyFrame(#sprite.frames + 1) end
+      last = last + add
       if s.timing then
         for fr = first, math.min(last, first + N - 1) do sprite.frames[fr].duration = 1 / s.fps end
       end
@@ -350,7 +361,7 @@ return function(Clip, Rig, Render, Colors, Util)
 
       clearTags(sprite, s.scope)
       if s.labels then
-        if s.scope == Ghost.ALL then addTag(sprite, 1, N, clip.name, { 0, 170, 255 }, s.scope) end
+        if s.scope == Ghost.ALL then addTag(sprite, 1, math.min(N, last), clip.name, { 0, 170, 255 }, s.scope) end
         for i = 0, math.min(N, last - first + 1) - 1 do
           local m = Clip.markForFrame(clip, i, N)
           if m then addTag(sprite, first + i, first + i, m, { 120, 120, 120 }, s.scope) end
