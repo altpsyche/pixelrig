@@ -13,7 +13,8 @@ guides inside the editor they already use. The artist draws every final pixel. I
 - **Guides first.** PixelRig generates reference and data; it never paints final art. Pixel ops
   (cutout rigs, rotation, retarget bakes) wait until an experiment shows artist cleanup costs less
   than redrawing.
-- **The artist's pixels are untouchable.** PixelRig writes only to layers and tags it owns.
+- **The artist's pixels are untouchable.** PixelRig writes only to layers and tags it owns, and
+  changes the timeline (frames, durations) only when the artist opts in.
 - **One undo step per change; previews never touch the sprite.**
 - **Plain extension.** Lua only, no native helper, no network, no forked Aseprite given to users.
 - **Motions are data.** A new motion is a clip file. If a motion needs code, the clip format has a
