@@ -198,9 +198,15 @@ return function(M)
     end
 
     -- Ghost.apply writes this dialog's sprite and leaves the artist's active sprite, layer and
-    -- frame as they were (#3).
-    local function applyNow()
-      if not alive() then return end
+    -- frame as they were (#3). `clicked`: the artist pressed Apply, the one case that alerts when
+    -- the sprite is closed.
+    local function applyNow(clicked)
+      if not alive() then
+        if clicked then
+          app.alert("The sprite this Ghost Reference was opened for is closed. Reopen the dialog on an open sprite.")
+        end
+        return
+      end
       pull()
       S.clip = work.name
       S.clipData = dirty and Clip.export(work) or nil
@@ -605,7 +611,7 @@ return function(M)
 
     dlg:separator()
     dlg:check { id = "autoApply", text = "Auto-apply to sprite", selected = false }
-    dlg:button { id = "apply", text = "Apply", focus = true, onclick = applyNow }
+    dlg:button { id = "apply", text = "Apply", focus = true, onclick = function() applyNow(true) end }
     dlg:button { id = "remove", text = "Remove", onclick = function()
       if alive() then Ghost.remove(sprite, S.scope) end
     end }
