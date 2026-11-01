@@ -64,13 +64,18 @@ return function(M)
       return pcall(function() return sprite.width end)
     end
 
+    -- Fit to art for this dialog's sprite at the current frame (Ghost.fitToArt), or nil.
+    local function fitArt()
+      return Ghost.fitToArt(sprite, app.frame and app.frame.frameNumber or 1)
+    end
+
     local function defaultsFor(scope)
       local s = Util.deepCopy(Ghost.DEFAULTS)
       s.scope = scope
       s.height = max(8, floor(sprite.height * 0.8))
       s.groundY = sprite.height - 1
       s.cx = sprite.width // 2
-      local fit = Ghost.fitToArt(sprite, app.frame and app.frame.frameNumber or 1, app.layer)
+      local fit = fitArt()
       if fit then s.height, s.groundY, s.cx = fit.height, fit.groundY, fit.cx end
       if scope ~= Ghost.ALL then
         local a, b = Ghost.scopeRange(sprite, scope)
@@ -456,7 +461,7 @@ return function(M)
 
     local function onFit()
       if not alive() then return end
-      local fit = Ghost.fitToArt(sprite, app.frame and app.frame.frameNumber or 1, app.layer)
+      local fit = fitArt()
       if not fit then
         app.alert("No art found: select an area or draw on a layer first.")
         return
@@ -579,7 +584,7 @@ return function(M)
     W:combobox { id = "facing", label = "Facing", option = S.facing, options = { "Right", "Left" }, onchange = changed }
 
     sec:begin("secPlace")
-    W:button { id = "fit", text = "Fit to art (selection / layer)", onclick = onFit }
+    W:button { id = "fit", text = "Fit to art (selection, else all visible art)", onclick = onFit }
     W:slider { id = "height", label = "Height px", min = 8, max = max(16, sprite.height * 2), value = S.height, onchange = changed }
     W:slider { id = "groundY", label = "Ground Y", min = 0, max = sprite.height - 1, value = S.groundY, onchange = changed }
     W:slider { id = "cx", label = "Center X", min = 0, max = sprite.width, value = S.cx, onchange = changed }

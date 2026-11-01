@@ -5,24 +5,35 @@ on:
     tags: [ "v*" ]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  release:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
+  # Everything CI runs (scripts/verify.sh, through ci.yml) on the tagged commit. Red stops the
+  # release: the publish job needs this one.
+  verify:
+    uses: ./.github/workflows/ci.yml
 
-      - name: Check tag matches package.json version
-        run: |
-          version="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' package.json | head -1)"
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match package.json version $version"
-            exit 1
-          fi
+  release:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # only this job, and only to create the release
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0 # the gate checks the tag is on origin/main
+          persist-credentials: false
+
+      # Fails unless the tag is v<package.json version>, its commit is on origin/main, and
+      # docs/releases/<tag>.md names this version and no other. Prints the notes to publish.
+      - name: Check the tag and its notes
+        run: tools/release-check.sh "$GITHUB_REF_NAME" origin/main > "$RUNNER_TEMP/notes.md"
 
       - name: Build packages
         run: tools/package.sh
+
+      - name: Check the archive holds only the extension
+        run: tools/check-archive.sh "dist/pixelrig-$GITHUB_REF_NAME.zip"
 
       - name: Create release
         env:
@@ -32,5 +43,5 @@ jobs:
           case "$GITHUB_REF_NAME" in *-*) prerelease="--prerelease" ;; esac
           gh release create "$GITHUB_REF_NAME" dist/* \
             --title "PixelRig $GITHUB_REF_NAME" \
-            --notes-file RELEASE_NOTES.md \
+            --notes-file "$RUNNER_TEMP/notes.md" \
             $prerelease

@@ -357,17 +357,14 @@ return function(Clip, Rig, Render, Colors, Util)
     return out
   end
 
-  -- Bounding box of art: selection, else active layer, else all visible art layers.
-  function Ghost.fitToArt(sprite, frameNumber, activeLayer)
+  -- Bounding box of art: the selection, else the union of all visible art layers in the frame
+  -- (ghost and reference layers excluded). The active layer does not narrow it (#42).
+  function Ghost.fitToArt(sprite, frameNumber)
     local bounds
     if not sprite.selection.isEmpty then
       bounds = sprite.selection.bounds
     else
-      local layers = artLayers(sprite)
-      if activeLayer and activeLayer.isImage and not Ghost.isGhost(activeLayer) and activeLayer:cel(frameNumber) then
-        layers = { activeLayer }
-      end
-      for _, l in ipairs(layers) do
+      for _, l in ipairs(artLayers(sprite)) do
         local cel = l:cel(frameNumber)
         if cel then
           local r = cel.image:shrinkBounds()
