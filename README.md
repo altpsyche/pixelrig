@@ -62,6 +62,8 @@ A motion is one JSON file. Built-ins live in `clips/`; saved clips go to `<asepr
 
 A clip file that cannot be used (for example: a file that cannot be read or is not valid JSON, no `rig` or a rig that is missing or unreadable, a channel without `keys`, a param without `channels`) is left out of the library, and the rest still load. The dialog names the first skipped file and why on one **Skipped** line under Clip (the Motion tab, or the Motion section on Aseprite builds without tabs), with a count of any others.
 
+**Save clip** (Pose tab) writes the clip to a file named after it, with spaces and characters a file name cannot hold replaced by `_` (`Run test` → `Run_test.json`); the clip's real name is kept inside the file, and a very long name is cut to 200 bytes for the file name. When that file already holds another clip (names that differ only in case count as the same file), the new one gets ` (2)`, ` (3)`, … (`Run/test` beside `Run test` → `Run_test (2).json`), so a save never replaces another clip. Saving under the name of one of your clips asks before replacing it, and writes that clip's own file, so the library shows what you saved. A save that cannot be written says why and leaves the file that was there as it was. If a save is cut short (say, Aseprite closes mid-save) and leaves only `<file>.json.bak`, that backup is listed as skipped; rename it to `.json` to get the clip back.
+
 Skeleton proportions live in `rigs/<name>.json`, normalized to standing height.
 
 ## Layout
