@@ -428,11 +428,15 @@ do
   local s = settings { height = 40, groundY = 46, cx = 24, frames = 4 }
   local want = reference(s)
 
-  -- A palette holding only the transparent entry has nothing visible to draw with: no error.
+  -- A palette holding only the transparent entry has nothing visible to draw with: Apply writes
+  -- nothing and returns a one-line note saying why, instead of an empty ghost (owner ruling, #50).
   local spr = Sprite(48, 48, ColorMode.INDEXED)
   spr.palettes[1]:resize(1)
-  check(Ghost.apply(spr, s, lib.clips.Run, rig) == nil and #spr.palettes[1] == 1,
-        "indexed: a palette with only the transparent entry applies without error, palette unchanged")
+  local note = Ghost.apply(spr, s, lib.clips.Run, rig)
+  check(type(note) == "string" and note:find("no visible color", 1, true) ~= nil and not note:find("\n", 1, true),
+        "indexed: a palette with only the transparent entry returns a one-line note: " .. tostring(note))
+  check(Ghost.findLayer(spr, Ghost.ALL) == nil and #spr.layers == 1 and #spr.palettes[1] == 1,
+        "indexed: that apply writes no ghost layer and leaves the palette unchanged")
   spr:close()
 
   spr = Sprite(48, 48, ColorMode.GRAY)

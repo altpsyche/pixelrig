@@ -408,5 +408,29 @@ do
   click("close")
 end
 
+-- An indexed palette with no visible color for the ghost (owner ruling, #50): Apply says so in one
+-- line, auto-apply stays silent, and no empty ghost is written.
+do
+  for k in pairs(widgets) do widgets[k] = nil end
+  local bare = Sprite(32, 32, ColorMode.INDEXED)
+  bare.palettes[1]:resize(1)
+  app.sprite = bare
+  M.UI.open()
+  local alerts = {}
+  rawset(app, "alert", function(t) table.insert(alerts, type(t) == "table" and t.text or t) end)
+  set("autoApply", true)
+  set("ease", "Ease in")
+  local autoAlerts = #alerts
+  click("apply")
+  rawset(app, "alert", nil)
+  check(autoAlerts == 0, "auto-apply with no visible palette color stays silent (" .. autoAlerts .. " alerts)")
+  check(#alerts == 1 and tostring(alerts[1]):find("no visible color", 1, true) ~= nil,
+        "apply with no visible palette color says so: " .. tostring(alerts[1]))
+  check(M.Ghost.findLayer(bare, M.Ghost.ALL) == nil, "apply with no visible palette color writes no ghost")
+  click("close")
+  bare:close()
+  app.sprite = spr
+end
+
 print((NOTABS and "[no tabs] " or "[tabs] ") .. (failures == 0 and "ALL PASSED" or (failures .. " FAILED")))
 if failures > 0 then error(failures .. " test(s) failed") end

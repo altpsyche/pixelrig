@@ -199,6 +199,20 @@ return function(Clip, Rig, Render, Colors, Util)
     return best
   end
 
+  Ghost.NO_VISIBLE_COLOR = "This sprite's palette has no visible color besides the transparent one, "
+    .. "so there is nothing to draw the ghost with. Add a color to the palette."
+
+  -- A one-line note when sprite cannot show a ghost at all: an indexed palette whose only visible
+  -- entry, if any, is the transparent index. Nil when the ghost can be drawn.
+  function Ghost.cannotDraw(sprite)
+    if sprite.colorMode ~= ColorMode.INDEXED then return nil end
+    local palette, transparent = sprite.palettes[1], sprite.transparentColor
+    for i = 0, #palette - 1 do
+      if i ~= transparent and palette:getColor(i).alpha > 0 then return nil end
+    end
+    return Ghost.NO_VISIBLE_COLOR
+  end
+
   -- Returns function({r,g,b}) -> pixel value for the color mode, cached. Indexed mode takes the
   -- sprite's palette and transparent index; it returns false for a color it cannot draw.
   function Ghost.pixelConverter(colorMode, palette, transparent)
@@ -311,6 +325,8 @@ return function(Clip, Rig, Render, Colors, Util)
   function Ghost.apply(sprite, s, clip, baseRig)
     local first, last = Ghost.scopeRange(sprite, s.scope)
     if not first then return "Tag '" .. s.scope .. "' not found" end
+    local note = Ghost.cannotDraw(sprite)
+    if note then return note end
     local build = Ghost.build(s, clip, baseRig)
     local N = build.N
 
