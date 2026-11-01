@@ -243,8 +243,9 @@ return function(M)
 
     -- Ghost.apply writes this dialog's sprite and leaves the artist's active sprite, layer and
     -- frame as they were (#3). `clicked`: the artist pressed Apply, the one case that alerts when
-    -- the sprite is closed or its palette has no visible color for the ghost; auto-apply stays
-    -- silent then, so it does not raise an alert on every change.
+    -- the sprite is closed, its palette has no visible color for the ghost, or the range's tag is
+    -- gone (an orphaned ghost, #6); auto-apply stays silent then, so it does not raise an alert on
+    -- every change.
     local function applyNow(clicked)
       if not alive() then
         if clicked then
@@ -253,6 +254,7 @@ return function(M)
         return
       end
       local note = Ghost.cannotDraw(sprite)
+      if not note and not Ghost.scopeRange(sprite, S.scope) then note = Ghost.rangeGone(S.scope) end
       if note then
         if clicked then app.alert(note) end
         return
@@ -488,11 +490,26 @@ return function(M)
       rebuild()
     end
 
+    -- Range lists All frames, the artist's tags and orphaned ghosts (Ghost.scopes, #6), as they
+    -- are now. A range that is no longer listed, such as a removed orphan, falls back to All frames.
+    local function refreshScopes()
+      local list, label = Ghost.scopes(sprite), Ghost.scopeLabel(sprite, S.scope)
+      local listed = false
+      for _, l in ipairs(list) do listed = listed or l == label end
+      if not listed then
+        label = Ghost.ALL
+        loadScope(label)
+        pushAll()
+        rebuild()
+      end
+      dlg:modify { id = "scope", options = list, option = label }
+    end
+
     local function onScopeChange()
-      local scope = dlg.data.scope
+      local scope = Ghost.scopeFor(sprite, dlg.data.scope)
       if scope == S.scope then return end
       if not confirmDiscard() then
-        dlg:modify { id = "scope", option = S.scope }
+        dlg:modify { id = "scope", option = Ghost.scopeLabel(sprite, S.scope) }
         return
       end
       loadScope(scope)
@@ -636,7 +653,8 @@ return function(M)
     sec:begin("secMotion")
     W:combobox { id = "clip", label = "Clip", option = work.name, options = lib.names, onchange = onClipChange }
     W:label { id = "skipped", label = "Skipped", text = "", visible = false }
-    W:combobox { id = "scope", label = "Range", option = S.scope, options = Ghost.scopes(sprite), onchange = onScopeChange }
+    W:combobox { id = "scope", label = "Range", option = Ghost.scopeLabel(sprite, S.scope), options = Ghost.scopes(sprite),
+                 onchange = onScopeChange }
     W:slider { id = "frames", label = "Frames", min = 2, max = 48, value = S.frames, onchange = changed }
     W:slider { id = "fps", label = "FPS", min = 1, max = 60, value = S.fps, onchange = onFps }
     W:check { id = "fillAll", label = "Frames", text = "Loop over range", selected = S.fillAll, onclick = changed }
@@ -708,7 +726,9 @@ return function(M)
     dlg:check { id = "autoApply", text = "Auto-apply to sprite", selected = false }
     dlg:button { id = "apply", text = "Apply", focus = true, onclick = function() applyNow(true) end }
     dlg:button { id = "remove", text = "Remove", onclick = function()
-      if alive() then Ghost.remove(sprite, S.scope) end
+      if not alive() then return end
+      Ghost.remove(sprite, S.scope)
+      refreshScopes()
     end }
     dlg:button { id = "close", text = "Close", onclick = function() dlg:close() end }
 

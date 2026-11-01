@@ -584,6 +584,57 @@ click("remove")
 check(M.Ghost.findLayer(spr, M.Ghost.ALL) == nil, "remove ghost")
 click("close")
 
+-- Ghosts wherever they are (#6): one moved into a group and one whose tag was renamed. Range lists
+-- the orphan in its existing combobox, no new row; Apply on it says so, auto-apply stays silent,
+-- and Remove clears it and falls back to All frames. Remove on All frames finds the grouped ghost.
+do
+  for k in pairs(widgets) do widgets[k] = nil end
+  local spr6 = Sprite(48, 48, ColorMode.RGB)
+  spr6:newEmptyFrame(2)
+  local walk = spr6:newTag(1, 2)
+  walk.name = "walk"
+  local G = M.Ghost
+  local s = M.Util.merge(G.DEFAULTS, { frames = 2, height = 30, groundY = 40, cx = 24 })
+  local lib6 = M.loadLibrary()
+  G.apply(spr6, s, lib6.clips.Run, lib6.rigs.humanoid)
+  s.scope = "walk"
+  G.apply(spr6, s, lib6.clips.Run, lib6.rigs.humanoid)
+  local group = spr6:newGroup()
+  G.findLayer(spr6, G.ALL).parent = group
+  walk.name = "stride"
+  app.sprite = spr6
+  app.layer = spr6.layers[1]
+  M.UI.open()
+  local orphan = "walk" .. G.ORPHAN
+  local listed = false
+  for _, o in ipairs(widgets.scope.options) do listed = listed or o == orphan end
+  check(listed and not widgets.orphan, "orphan listed in Range: " .. table.concat(widgets.scope.options, ", "))
+  set("scope", orphan)
+  check(widgets.scope.value == orphan, "orphan picked in Range")
+  local alerts = {}
+  rawset(app, "alert", function(t) table.insert(alerts, type(t) == "table" and t.text or t) end)
+  set("autoApply", true)
+  set("ease", "Ease in")
+  local autoAlerts = #alerts
+  click("apply")
+  rawset(app, "alert", nil)
+  check(autoAlerts == 0, "auto-apply on an orphan stays silent (" .. autoAlerts .. " alerts)")
+  check(#alerts == 1 and tostring(alerts[1]):find("is gone", 1, true) ~= nil,
+        "apply on an orphan says so: " .. tostring(alerts[1]))
+  set("autoApply", false)
+  click("remove")
+  listed = false
+  for _, o in ipairs(widgets.scope.options) do listed = listed or o == orphan end
+  check(G.findLayer(spr6, "walk") == nil and not listed and widgets.scope.value == G.ALL,
+        "remove clears the orphan and Range falls back to All frames (" .. widgets.scope.value .. ")")
+  check(G.findLayer(spr6, G.ALL) ~= nil and G.findLayer(spr6, G.ALL).parent == group, "the grouped ghost is found")
+  click("remove")
+  check(G.findLayer(spr6, G.ALL) == nil and #group.layers == 0, "remove on All frames deletes the grouped ghost")
+  click("close")
+  spr6:close()
+  app.sprite = spr
+end
+
 -- The dialog's sprite closed (#3): Apply says so, auto-apply stays silent.
 do
   for k in pairs(widgets) do widgets[k] = nil end

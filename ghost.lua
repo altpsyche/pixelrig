@@ -29,6 +29,33 @@ return function(Clip, Rig, Render, Colors, Util)
     return (tag.data or ""):find(Ghost.MARK, 1, true) == 1
   end
 
+  local function findTag(sprite, name)
+    for _, tag in ipairs(sprite.tags) do
+      if tag.name == name and not isGhostTag(tag) then return tag end
+    end
+    return nil
+  end
+
+  -- An orphaned ghost's scope names a tag that was renamed or deleted (#6). The Range list shows
+  -- it under this suffix, so the artist can still pick it and Remove it.
+  Ghost.ORPHAN = " (tag gone)"
+
+  local function isOrphan(sprite, scope)
+    return scope ~= Ghost.ALL and not findTag(sprite, scope)
+  end
+
+  -- The one-line note for Apply on a range whose tag is gone.
+  function Ghost.rangeGone(scope)
+    return "Tag '" .. scope .. "' is gone. Pick another range, or Remove its ghost."
+  end
+
+  -- The Range list's text for scope: the scope itself, or for an orphan, scope .. Ghost.ORPHAN.
+  function Ghost.scopeLabel(sprite, scope)
+    return isOrphan(sprite, scope) and (scope .. Ghost.ORPHAN) or scope
+  end
+
+  -- What the Range list shows: All frames, every artist tag, then every orphaned ghost's label
+  -- in layer order, once each.
   function Ghost.scopes(sprite)
     local list = { Ghost.ALL }
     for _, tag in ipairs(sprite.tags) do
@@ -36,14 +63,27 @@ return function(Clip, Rig, Render, Colors, Util)
         table.insert(list, tag.name)
       end
     end
+    local seen = {}
+    for _, layer in ipairs(Ghost.layers(sprite)) do
+      local scope = Ghost.layerScope(layer)
+      if not seen[scope] and isOrphan(sprite, scope) then
+        seen[scope] = true
+        table.insert(list, Ghost.scopeLabel(sprite, scope))
+      end
+    end
     return list
   end
 
-  local function findTag(sprite, name)
-    for _, tag in ipairs(sprite.tags) do
-      if tag.name == name and not isGhostTag(tag) then return tag end
+  -- The scope a Range label stands for: a label Ghost.scopes lists for an orphan maps back to the
+  -- orphan's scope; anything else is a scope already.
+  function Ghost.scopeFor(sprite, label)
+    if label == Ghost.ALL or findTag(sprite, label) then return label end
+    local n = #Ghost.ORPHAN
+    if label:sub(-n) == Ghost.ORPHAN then
+      local scope = label:sub(1, -n - 1)
+      if isOrphan(sprite, scope) and Ghost.findLayer(sprite, scope) then return scope end
     end
-    return nil
+    return label
   end
 
   -- First/last frame numbers of a scope, or nil if the tag is gone.
@@ -65,19 +105,39 @@ return function(Clip, Rig, Render, Colors, Util)
     return math.min(N, len + add), N, add
   end
 
+  -- A ghost layer is an image layer carrying the mark; its range is in PixelRig's own properties.
   function Ghost.isGhost(layer)
-    return layer and layer.data == Ghost.MARK
+    return layer ~= nil and not layer.isGroup and layer.data == Ghost.MARK
   end
 
   function Ghost.layerScope(layer)
     return layer.properties(PROPS).scope or Ghost.ALL
   end
 
-  function Ghost.findLayer(sprite, scope)
-    for _, layer in ipairs(sprite.layers) do
-      if Ghost.isGhost(layer) and Ghost.layerScope(layer) == scope then return layer end
+  -- Every ghost layer in the sprite, inside groups too (#6), top-level order first.
+  function Ghost.layers(sprite)
+    local found = {}
+    local function walk(layers)
+      for _, layer in ipairs(layers) do
+        if layer.isGroup then walk(layer.layers)
+        elseif Ghost.isGhost(layer) then table.insert(found, layer) end
+      end
     end
-    return nil
+    walk(sprite.layers)
+    return found
+  end
+
+  -- Every ghost layer of scope; more than one only where an older version made a duplicate.
+  local function scopeLayers(sprite, scope)
+    local found = {}
+    for _, layer in ipairs(Ghost.layers(sprite)) do
+      if Ghost.layerScope(layer) == scope then table.insert(found, layer) end
+    end
+    return found
+  end
+
+  function Ghost.findLayer(sprite, scope)
+    return scopeLayers(sprite, scope)[1]
   end
 
   function Ghost.loadSettings(layer)
@@ -302,10 +362,12 @@ return function(Clip, Rig, Render, Colors, Util)
     tag.color = Color { r = rgb[1], g = rgb[2], b = rgb[3] }
   end
 
-  -- The active layer and frame number, with `removed` (a layer about to be deleted) left out.
+  -- The active layer and frame number, with `removed` (layers about to be deleted) left out.
   local function site(removed)
     local layer, frame = app.layer, app.frame
-    if removed and layer == removed then layer = nil end
+    for _, gone in ipairs(removed or {}) do
+      if layer == gone then layer = nil end
+    end
     return layer, frame and frame.frameNumber
   end
 
@@ -317,7 +379,7 @@ return function(Clip, Rig, Render, Colors, Util)
   -- Runs fn as one undo step on sprite, made active for it since NewLayer and app.transaction act
   -- on the active sprite, then puts the artist back where they were (#3): adding frames moves the
   -- active frame. Both the active sprite's layer and frame and, when another sprite was active,
-  -- sprite's own layer and frame are restored. `removed`, a layer fn deletes, is not restored.
+  -- sprite's own layer and frame are restored. `removed`, the layers fn deletes, are not restored.
   local function transactionOn(sprite, label, fn, removed)
     local prevSprite = app.sprite
     local prevLayer, prevFrame = site(removed)
@@ -339,7 +401,7 @@ return function(Clip, Rig, Render, Colors, Util)
   -- and frame as they were. Returns error string or nil.
   function Ghost.apply(sprite, s, clip, baseRig)
     local first, last = Ghost.scopeRange(sprite, s.scope)
-    if not first then return "Tag '" .. s.scope .. "' not found" end
+    if not first then return Ghost.rangeGone(s.scope) end
     local note = Ghost.cannotDraw(sprite)
     if note then return note end
     local build = Ghost.build(s, clip, baseRig)
@@ -406,12 +468,13 @@ return function(Clip, Rig, Render, Colors, Util)
     return nil
   end
 
+  -- Deletes every ghost layer of scope, wherever it sits (#6), and its tags, as one undo step.
   function Ghost.remove(sprite, scope)
-    local layer = Ghost.findLayer(sprite, scope)
+    local layers = scopeLayers(sprite, scope)
     transactionOn(sprite, "Remove Ghost Reference", function()
-      if layer then sprite:deleteLayer(layer) end
+      for _, layer in ipairs(layers) do sprite:deleteLayer(layer) end
       clearTags(sprite, scope)
-    end, layer)
+    end, layers)
     app.refresh()
   end
 
