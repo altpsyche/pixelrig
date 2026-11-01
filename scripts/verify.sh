@@ -37,4 +37,9 @@ else
   echo "verify: gitleaks not found, secret scan skipped (CI runs it)" >&2
 fi
 
-# Project checks: add them here in Phase 0.
+# Project checks (PixelRig) live in tools/check.sh; AGENTS.md § Verifying your work lists them.
+# Guarded on the file so scripts/verify.test.mjs's stand-in trees, which copy only this script,
+# still pass.
+if [ -f tools/check.sh ]; then
+  tools/check.sh
+fi

@@ -19,7 +19,9 @@ jobs:
   # evals/, the eval runner and cleanup scripts' tests against a stub gh, the claim read-back and
   # frontier query tests and the Jev tools' tests against a fake server (plain Node, no packages,
   # plus the runner's jq for the query tests and the stubs; no TYPESAFE_API_KEY: Jev never runs in
-  # CI, ADR-0002), the gitleaks secret scan, and whatever project checks Phase 0 adds to it.
+  # CI, ADR-0002), the gitleaks secret scan, and PixelRig's checks: Lua syntax (luac5.4), clip and
+  # rig JSON, and the release archive. The Aseprite batch tests need a binary CI does not have; they
+  # run locally (AGENTS.md § Verifying your work).
   # Update AGENTS.md § Verifying your work in the same commit.
   verify:
     runs-on: ubuntu-latest
@@ -40,4 +42,6 @@ jobs:
           echo "${SHA256}  gitleaks.tgz" | sha256sum -c -
           tar -xzf gitleaks.tgz gitleaks
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - name: Install Lua 5.4 (Aseprite's Lua) for the syntax check
+        run: sudo apt-get update -q && sudo apt-get install -y -q lua5.4
       - run: scripts/verify.sh

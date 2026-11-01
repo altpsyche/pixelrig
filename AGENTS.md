@@ -1,22 +1,25 @@
-# <Project> — Agent Context
+# PixelRig — Agent Context
 
-<!-- TEMPLATE: replace every <...> placeholder, then delete this comment. See README.md § Using this template. -->
+An Aseprite extension in Lua: a guides-first animation toolkit for pixel art. MIT, solo owner.
+Repo: `altpsyche/pixelrig`.
 
-<One line: what kind of project this is (a game, a study, a clinical protocol, an app) and its main
-tools.> <License>, solo owner. Repo: `<owner>/<repo>`.
+PixelRig generates reference poses, timing and motion guides inside Aseprite so solo and indie
+pixel artists animate faster; the artist draws every final pixel. Characters 32–128px tall, side
+view first, humanoid first.
 
-<One paragraph: what the project produces, for whom.>
-
-**Constitution.** <The non-negotiables: what this project never does. These are the project, not
-tunable defaults. Mirror them in the review checklist, `docs/workflow.md` § The constitution.>
+**Constitution.** PixelRig never edits the artist's pixels: it writes only to layers and tags it
+owns and marks (`pixelrig-ghost`). Every change to a sprite is one undo step, and a preview never
+changes the sprite. It ships as a plain Lua extension: no native helper, no network, no Aseprite
+build or fork given to users (Aseprite EULA). It never generates final art with AI. A new motion is
+data (a clip file), not code. Mirror these in `docs/workflow.md` § The constitution.
 
 > **Stay under 200 lines** — this loads into every session. Detail belongs in a co-located `.md`.
 > **Session start:** the owner says a trigger word, as listed in `/work`'s `description`, with no
 > ticket → follow [`.agents/skills/work/SKILL.md`](.agents/skills/work/SKILL.md).
 > **Skills:** `/name` anywhere in this repo means read `.agents/skills/name/SKILL.md` and follow it.
 > Every agent reads the file, whatever its harness does with the folder.
-> **Pre-work:** Phase 0 has not landed. [`docs/idea.md`](docs/idea.md) is the source of truth, and
-> the layout below is the plan, not a description of files on disk.
+> **State:** Phase 0 and Phase 1 have landed: Ghost Reference shipped as `v0.0.1-alpha`.
+> [`docs/idea.md`](docs/idea.md) is the source of truth for what comes next.
 
 ## Where things live
 
@@ -25,9 +28,10 @@ tunable defaults. Mirror them in the review checklist, `docs/workflow.md` § The
 | Intent — the WHY | [`docs/idea.md`](docs/idea.md) — authoritative |
 | ADRs — the WHY, decided | [`docs/adr/`](docs/adr/), named `NNNN-kebab-title.md` |
 | Specs — the WHAT | [`docs/specs/`](docs/specs/) |
-| How a part works — the HOW | a co-located `.md` beside the work it describes |
+| How a part works — the HOW | a co-located `.md` beside the work it describes; the extension's module map is in [`README.md`](README.md) § Layout |
 | Vocabulary | `GLOSSARY.md`, created lazily by `/domain-modeling`. Until it exists, `docs/idea.md` § Core Concepts is the authority |
 | Issues, PR state | **GitHub issues** — see [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md) |
+| Roadmap checklist | [`TODO.md`](TODO.md), mirrored by `docs/idea.md` § Roadmap; the idea wins |
 | Local scratch, never authoritative | `.scratch/` (gitignored) |
 | Skills | [`.agents/skills/README.md`](.agents/skills/README.md) |
 | Skill evals | [`evals/README.md`](evals/README.md); when a PR runs them: `docs/workflow.md` § 2 |
@@ -41,18 +45,23 @@ Fix the stale source in the same commit, or say plainly that you did not.
 
 ```bash
 scripts/verify.sh     # everything CI runs
+ASEPRITE=/path/to/aseprite scripts/verify.sh   # plus the Aseprite headless tests
 ```
 
-**Prefer running it over reasoning about whether your change is correct.** Today it checks the agent
+**Prefer running it over reasoning about whether your change is correct.** It checks the agent
 layer (skill frontmatter, doc links, commands a shell guard refuses, no harness-specific files,
 eval folders that name a skill, this file's budget, the tracker's claim read-back and frontier
 queries), tests itself, the pre-push hook, `bootstrap.sh`'s ruleset step against a stub `gh`, the
 eval case parser over every case in `evals/`, the eval runner and cleanup scripts against a stub
 `gh`, and the Jev tools in [`scripts/jev/`](scripts/jev/README.md), the latter against a fake
-server, and scans every commit for secrets with gitleaks. Phase 0 adds the project's own checks to
-it. Update this block and [`.github/workflows/ci.yml`](.github/workflows/ci.yml) in the same commit
-that wires them. An Implementer also runs it before changing anything, per
-[`docs/workflow.md`](docs/workflow.md) § 2, step 3.
+server, and scans every commit for secrets with gitleaks. Project checks: every `.lua` file
+compiles (`luac -p`), every clip and rig JSON parses, `tools/package.sh` builds an archive with
+`package.json` at its root, and, when an Aseprite binary is found (`$ASEPRITE`, or `aseprite` on
+`PATH`), `tests/headless.lua` and `tests/ui_mock.lua` run in batch mode. CI has no Aseprite, so
+it skips those two and says so; run them locally before a PR that touches Lua. Update this block and
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) in the same commit that changes the checks.
+An Implementer also runs it before changing anything, per [`docs/workflow.md`](docs/workflow.md)
+§ 2, step 3.
 
 A pre-push hook, [`.githooks/pre-push`](.githooks/pre-push), runs it before every push and blocks
 a red push. How it is switched on: [`scripts/install-hooks.sh`](scripts/install-hooks.sh).
@@ -63,7 +72,12 @@ The parts of the project and how they fit live in [`docs/idea.md`](docs/idea.md)
 **Read the relevant part there before adding or reshaping one**; do not restate it here, it will
 drift.
 
-<Constraints that are easy to get wrong and expensive to undo, one bullet each, once they exist.>
+- The extension is the repo root: `package.json`, `*.lua`, `clips/`, `rigs/`. Everything else
+  (`docs/`, `scripts/`, `tests/`, `tools/`, `.agents/`, `evals/`) stays out of the release
+  archive; `tools/package.sh` lists what ships.
+- Aseprite skips a symlinked extension folder. `tools/dev-install.sh` links files one by one;
+  rerun it after adding a top-level file.
+- Releases come from a `v<version>` tag that matches `package.json`; see `README.md` § Releasing.
 
 ## Anti-Patterns
 
@@ -77,16 +91,32 @@ Each of these is decided and load-bearing. Sources are authoritative; read them 
 - Do not pass `--no-verify` to git as an agent. It skips the pre-push hook that keeps red work
   off the remote; the owner may still use it. See
   [ADR-0001](docs/adr/0001-agentic-development-workflow.md) § Amendments.
-- <Project-specific anti-patterns, each with its source.>
+- Do not touch a layer, cel or tag PixelRig does not own. Owned ones carry `pixelrig-ghost` in
+  `data` (see `ghost.lua`). Source: the constitution.
+- Do not change a sprite outside `app.transaction`, or from preview code. Source: the constitution.
+- Do not read `json.decode` results directly: they are lazy userdata. Use `Util.decode` /
+  `Util.readJson` (`util.lua`).
+- Do not pass a multi-return call in the middle of an argument list; Lua keeps only its first
+  value (`rig.lua` `along()` exists for this).
+- Do not use `string.find` with a literal containing `-` or other magic characters without the
+  plain flag (`find(s, 1, true)`).
+- Do not test dialog code by opening `Dialog` in batch mode: it is nil there. Drive it through
+  `tests/ui_mock.lua`.
+- Do not claim a UI behaviour works because the mock passes. Say it is mock-tested until the owner
+  confirms it in Aseprite.
 
 ## ADRs — `docs/adr/`
 
 Read the full ADR when it governs your work; the file is the authority, this is an index.
 
-- **Accepted:** [0001](docs/adr/0001-agentic-development-workflow.md) agentic development workflow;
-  [0002](docs/adr/0002-jev-optional-dev-tooling.md) Jev for closed-set questions, optional;
-  [0003](docs/adr/0003-eval-runs-real-sandboxes-guard-safe-commands.md) eval runs: real sandboxes,
-  guard-safe commands, outcome criteria
+- **Accepted (from the template):** [0001](docs/adr/0001-agentic-development-workflow.md) agentic
+  development workflow; [0002](docs/adr/0002-jev-optional-dev-tooling.md) Jev for closed-set
+  questions, optional; [0003](docs/adr/0003-eval-runs-real-sandboxes-guard-safe-commands.md) eval
+  runs: real sandboxes, guard-safe commands, outcome criteria;
+  [template/0004](docs/adr/template/0004-template-adrs-in-own-folder-specs-dropped.md) template
+  ADRs in their own folder, specs dropped
+- **PixelRig's own:** none yet. The template has not finished moving 0001–0003 into
+  `docs/adr/template/`; until it does, PixelRig's first ADR is 0005, so no number collides.
 - **Pending:** the open questions in [`docs/idea.md`](docs/idea.md) § Open Questions stay there until
   one is decided. A decided question gets a number here and a file in `docs/adr/`.
 

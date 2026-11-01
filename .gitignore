@@ -1,3 +1,24 @@
-tests/out/
+# Local scratch: draft specs and ticket breakdowns, never authoritative.
+# See docs/agents/issue-tracker.md.
+.scratch/
+
+# Secrets and local config. Nothing here should ever be committed.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+
+# Editors and OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# Project build output and test artifacts
 dist/
+tests/out/
 *.zip

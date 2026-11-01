@@ -59,9 +59,10 @@ test('phase options are the docs/idea.md § Roadmap headings, each with its bull
   const client = fakeClient({ choice: 'needs-info', confidence: 0.9 }, { choice: 'phase:0', confidence: 0.9 });
   await run(ISSUE, { client });
   const { criteria } = client.calls[0].questions.phase;
-  assert.deepEqual(Object.keys(criteria), ['phase:0', 'phase:1']);
+  // PixelRig: these follow this repo's docs/idea.md § Roadmap, which the test reads.
+  assert.deepEqual(Object.keys(criteria), ['phase:0', 'phase:1', 'phase:2', 'phase:3', 'phase:4', 'phase:5']);
   assert.match(criteria['phase:0'], /^Foundation: /);
-  assert.match(criteria['phase:0'], /CI running every check/);
+  assert.match(criteria['phase:0'], /CI runs them/);
 });
 
 // The band edge sits at 0.8 (TRIAGE_CONFIDENT): a retune that moves it fails these on purpose.

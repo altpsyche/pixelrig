@@ -48,5 +48,5 @@ layout precisely because those are the skills' defaults, which means zero path r
   [`.githooks/pre-push`](../../.githooks/pre-push), which checks a clean tree: it refuses a push
   while the tree holds any change or untracked file, so `scripts/verify.sh` checks the committed
   HEAD. An agent never skips it with `--no-verify`; the owner may, as the person accountable for
-  the push. Recorded per [the agentic guardrails spec](../specs/agentic-guardrails-2026.md)
+  the push. Recorded per [the agentic guardrails spec](https://github.com/altpsyche/altpsyche-agentic-engineering/blob/main/docs/specs/agentic-guardrails-2026.md)
   § Pre-push hook; the owner signs it off by merging.

@@ -22,8 +22,20 @@ When your output names a domain concept (an issue title, a test name, a type nam
 `docs/idea.md` § Core Concepts and the work define it. Do not drift to synonyms. If a synonym is
 genuinely better, `/domain-modeling` changes the model and the vocabulary together, in one commit.
 
-<!-- TEMPLATE: once terms settle, list the distinctions agents most often blur here, e.g.
-- **Term A** vs **Term B** — what separates them. Never "synonym". -->
+Distinctions agents most often blur:
+
+- **Clip** vs **sprite animation** — a clip is motion data with no pixels; the sprite's frames are
+  the artist's. Never "animation" for a clip.
+- **Pose** vs **skeleton** — a pose is channel values; a skeleton is the pose solved to joint
+  positions.
+- **Key pose (mark)** vs **key** — a key pose is a named moment of the whole clip that owns
+  spacing; a key is one channel's value at one time.
+- **Ghost** vs **ghost layer** — the ghost is the rendered figure; the ghost layer is the
+  reference layer that holds it.
+- **Range** vs **tag** — a range is where a ghost lives: all frames or one tag. PixelRig's own
+  key pose tags are never a range.
+- **Preview** vs **apply** — preview renders in the dialog only; apply writes to the sprite.
+- **Near / far** vs **left / right** — sides are relative to the viewer, not the body.
 
 ## Where the skills' open questions are answered
 

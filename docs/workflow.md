@@ -291,19 +291,28 @@ Applied in full on every review. Each line is a hard rule, not a judgement call.
 
 **The constitution** — a violation here blocks the merge outright
 
-<!-- TEMPLATE: replace with this project's constitution from AGENTS.md. -->
-
 - No secret, credential, or personal or confidential data is committed, logged, or shared beyond
   where the owner put it.
-- <The project's other non-negotiables.>
+- PixelRig writes only to layers, cels and tags it owns and marks `pixelrig-ghost`; nothing the
+  artist drew or named is changed.
+- Every change to a sprite is one `app.transaction`, so it undoes in one step; preview code never
+  changes a sprite.
+- The extension is plain Lua: no native helper, no network access, no Aseprite build or fork given
+  to users.
+- No AI or ML generates final art.
+- A new motion is a clip file, not motion-specific code.
 
 **Domain**
 
-<!-- TEMPLATE: the field's hard rules, added as Phase 0 lands: a build or lint for code, a style
-guide for writing, a protocol or citation standard for research, a clinical or regulatory rule for
-care work. -->
-
 - `scripts/verify.sh` is green, including every check Phase 0 added to it.
+- A PR that touches `*.lua` has `tests/headless.lua` and `tests/ui_mock.lua` passing in its
+  `## Evidence`, run locally with `ASEPRITE` set (CI has no Aseprite).
+- A behaviour visible in the editor is called mock-tested until the owner confirms it in Aseprite;
+  the PR says which.
+- Generated guides are crisp at 32–128px: whole-pixel snapping, no anti-aliasing. A render change
+  includes before and after sheets from `tests/out/`.
+- The release archive (`tools/package.sh`) ships only the extension: `package.json` at its root,
+  no tests, tools or agent files.
 - Nothing destructive or irreversible without an ADR.
 
 **Craft**
