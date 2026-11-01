@@ -180,6 +180,35 @@ do
   os.remove(path .. ".tmp")
   local kept = M.loadLibrary().clips.Dup
   check(writeWhy ~= nil and kept and kept.fps == 20, "failed write keeps the clip that was there")
+
+  -- Replacing a file where rename will not overwrite it (Windows): os.rename is stubbed to refuse
+  -- moving the temporary file onto an existing file, and, in the second case, to refuse it always.
+  local realRename = os.rename
+  local function stubRename(always)
+    local first = true
+    os.rename = function(from, to)
+      if from == path .. ".tmp" and to == path and (always or (first and app.fs.isFile(to))) then
+        first = false
+        return nil, from .. ": File exists"
+      end
+      return realRename(from, to)
+    end
+  end
+  d.fps = 40
+  stubRename(false)
+  local okReplace = Util.writeJson(path, d)
+  os.rename = realRename
+  local replaced = M.loadLibrary().clips.Dup
+  check(okReplace and replaced and replaced.fps == 40 and not app.fs.isFile(path .. ".bak"),
+        "write replaces a file when rename will not overwrite, leaving no backup")
+  d.fps = 50
+  stubRename(true)
+  local okStuck, stuckWhy = Util.writeJson(path, d)
+  os.rename = realRename
+  local survived = M.loadLibrary().clips.Dup
+  check(not okStuck and stuckWhy and survived and survived.fps == 40
+        and not app.fs.isFile(path .. ".bak") and not app.fs.isFile(path .. ".tmp"),
+        "write that cannot move the new file in keeps the old one (" .. tostring(stuckWhy) .. ")")
   M.userClipsDir = userDir
 end
 

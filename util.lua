@@ -41,8 +41,16 @@ function Util.writeJson(path, data)
     local closed, closeErr = f:close()
     if not (wrote and closed) then error(writeErr or closeErr, 0) end
     local moved, moveErr = os.rename(tmp, path)
-    -- Windows will not rename onto an existing file: remove it, then move.
-    if not moved and app.fs.isFile(path) and os.remove(path) then moved, moveErr = os.rename(tmp, path) end
+    -- Windows will not rename onto an existing file: move the old one aside to a backup, move
+    -- the new one in, then drop the backup. If the new one cannot move in, the backup goes back,
+    -- so one version always survives.
+    if not moved and app.fs.isFile(path) then
+      local bak = path .. ".bak"
+      if os.rename(path, bak) then
+        moved, moveErr = os.rename(tmp, path)
+        if moved then os.remove(bak) else os.rename(bak, path) end
+      end
+    end
     if not moved then error(moveErr, 0) end
   end)
   if ok then return true end
