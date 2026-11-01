@@ -490,7 +490,7 @@ return function(M)
         app.alert("'" .. name .. "' is a built-in clip. Pick another name.")
         return
       end
-      -- Never overwrite silently (#7): saving over a clip or file asks first.
+      -- Never overwrite silently (#7): saving over one of the artist's clips asks first.
       local path, replacing = M.clipSavePath(lib, name)
       if replacing then
         local r = app.alert { title = "PixelRig", text = "Replace " .. replacing .. "?",

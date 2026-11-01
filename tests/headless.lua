@@ -93,29 +93,23 @@ end
 -- Saving clips: file names never collide, duplicates never shadow, a failed write returns (#7).
 do
   local f = Clip.fileName
-  local function distinct(a, b)
-    local fa, fb = f(a), f(b)
-    check(fa ~= fb and fa:lower() ~= fb:lower(),
-          "file name: '" .. a .. "' and '" .. b .. "' differ (" .. fa .. ", " .. fb .. ")")
-  end
-  distinct("a/b", "a_b")
-  distinct("日本", "中文")
-  distinct("Walk", "walk")
-  distinct("a b", "a_b")
-  distinct("a.b", "a_2eb")
-  check(f("run test") == "run test.json", "file name: plain lowercase names stay readable (" .. f("run test") .. ")")
-  check(f("Run/test") == "^run_2ftest.json" and f("日本") == "_e6_97_a5_e6_9c_ac.json" and f("con") == "_63on.json",
-        "file name: uppercase as ^, other bytes as hex, device names escaped")
+  -- Readable: the clip name with path-unsafe characters replaced by '_' (owner ruling on #53).
+  check(f("Run test") == "Run_test.json" and f("a/b") == "a_b.json" and f("日本") == "日本.json",
+        "file name: readable slug of the clip name (" .. f("Run test") .. ", " .. f("a/b") .. ", " .. f("日本") .. ")")
+  check(f("Run test", 2) == "Run_test (2).json", "file name: numbered suffix (" .. f("Run test", 2) .. ")")
+  check(f("con") == "_con.json" and f("Nul.x") == "_Nul.x.json" and f(".hidden") == "_hidden.json"
+        and f("a.") == "a_.json", "file name: device names, leading and trailing dots escaped")
   local safe = true
-  for _, n in ipairs({ "a/b", "a\\b", "日本", "x:y*z?", "C<>|\"", "..", "con", "Nul", "lpt1", "a.", "ü" }) do
+  for _, n in ipairs({ "a/b", "a\\b", "x:y*z?", "C<>|\"", "..", "con", "Nul", "lpt1", "COM3.b", "a.", "tab\tx" }) do
     local stem = f(n):gsub("%.json$", "")
-    local low = stem:lower()
-    if stem:find("[^%w%-_%^ ]") or low == "con" or low == "nul" or low:match("^lpt%d$") then
+    local base = stem:match("^[^.]*"):lower()
+    if stem:find('[%c/\\:*?"<>| ]') or stem:find("^%.") or stem:find("%.$") or base == "con"
+      or base == "nul" or base:match("^lpt%d$") or base:match("^com%d$") then
       safe = false
       print("     unsafe file name for '" .. n .. "': " .. f(n))
     end
   end
-  check(safe, "file name: only portable characters, no Windows device names")
+  check(safe, "file name: no path-unsafe characters, no Windows device names")
 
   local dir = app.fs.joinPath(out, "saveclips")
   app.fs.makeAllDirectories(dir)
@@ -150,22 +144,37 @@ do
   check(builtinDup, "library: a user clip named like a built-in is listed as skipped")
   check(dup and Clip.export(dup).file == nil and Clip.export(dup).origin == nil, "export drops runtime fields")
 
-  -- Saving over an existing user clip writes its own file; a new name gets the encoded file.
+  -- Saving over an existing user clip writes its own file; a new name gets its readable file.
   local path, replacing = M.clipSavePath(dupLib, "Dup")
   check(dup and path == dup.file and replacing == "your clip 'Dup'",
         "save path: an existing user clip is saved over its own file (" .. tostring(replacing) .. ")")
-  local newPath, newReplacing = M.clipSavePath(dupLib, "a/b")
-  check(newPath == app.fs.joinPath(dir, "a_2fb.json") and newReplacing == nil,
-        "save path: a new name gets its encoded file")
-  -- A file already at the encoded name, as an older file differing only in case would be on a
-  -- disk that ignores case: saving asks, naming the clip the file holds.
-  put("^taken.json", "Something else", 9)
-  local _, takenReplacing = M.clipSavePath(dupLib, "Taken")
-  check(takenReplacing == "your clip 'Something else' (^taken.json)",
-        "save path: a file under the new name is named with its clip (" .. tostring(takenReplacing) .. ")")
-  Util.writeJson(app.fs.joinPath(dir, "^junk.json"), { 1, 2 })
-  local _, junkReplacing = M.clipSavePath(dupLib, "Junk")
-  check(junkReplacing == "the file ^junk.json", "save path: a file holding no clip is named as a file")
+  local function savePath(name)
+    local p, r = M.clipSavePath(M.loadLibrary(), name)
+    return app.fs.fileName(p), r
+  end
+  check(savePath("a/b") == "a_b.json", "save path: a new name gets its readable file")
+  -- Two names, one slug: the second gets a numbered file, never the first's.
+  put("a_b.json", "a_b", 9)
+  local ab, abReplacing = savePath("a/b")
+  check(ab == "a_b (2).json" and abReplacing == nil, "save path: 'a/b' beside 'a_b' gets " .. ab)
+  put("a_b (2).json", "a?b", 9)
+  check(savePath("a*b") == "a_b (3).json", "save path: the next free number (" .. savePath("a*b") .. ")")
+  -- Names differing only in case share a file on a disk that ignores case: compared lowercased.
+  put("Walk.json", "Walk", 9)
+  check(savePath("walk") == "walk (2).json", "save path: 'walk' beside 'Walk' gets " .. savePath("walk"))
+  check(savePath("日本") ~= savePath("中文"), "save path: non-ASCII names get their own files")
+  -- A file at the slug holding another clip, or no clip, is never replaced.
+  Util.writeJson(app.fs.joinPath(dir, "Junk.json"), { 1, 2 })
+  local junk, junkReplacing = savePath("Junk")
+  check(junk == "Junk (2).json" and junkReplacing == nil, "save path: a file holding no clip is kept (" .. junk .. ")")
+  -- A file at the slug holding this very clip name, which did not load: replaced after asking.
+  put("Broke.json", "Broke", 9)
+  local brokeData = Util.readJson(app.fs.joinPath(dir, "Broke.json"))
+  brokeData.rig = "nope"
+  Util.writeJson(app.fs.joinPath(dir, "Broke.json"), brokeData)
+  local broke, brokeReplacing = savePath("Broke")
+  check(broke == "Broke.json" and brokeReplacing == "your clip 'Broke' (Broke.json)",
+        "save path: an unusable file holding the same name is replaced after asking (" .. tostring(brokeReplacing) .. ")")
 
   local d = Util.deepCopy(run)
   d.name, d.fps = "Dup", 20

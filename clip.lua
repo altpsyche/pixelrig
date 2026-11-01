@@ -103,16 +103,14 @@ end
 local DEVICES = { con = true, prn = true, aux = true, nul = true }
 for i = 0, 9 do DEVICES["com" .. i], DEVICES["lpt" .. i] = true, true end
 
--- File name a clip is saved under. Reversible, so two names never share a file, even on a disk
--- that ignores case: lowercase letters, digits, '-' and space stay; an uppercase letter becomes
--- '^' and the letter; any other byte becomes '_' and two hex digits ("a/b" -> "a_2fb").
-function Clip.fileName(name)
-  local stem = name:gsub("[^a-z0-9%- ]", function(c)
-    if c:match("%u") then return "^" .. c:lower() end
-    return string.format("_%02x", c:byte())
-  end)
-  -- Windows refuses device names such as "con.json": escape the first letter.
-  if DEVICES[stem] then stem = string.format("_%02x", stem:byte(1)) .. stem:sub(2) end
+-- Readable file name a clip is saved under: the name with control characters, spaces and
+-- characters a path cannot hold replaced by '_' ("Run test" -> "Run_test.json"); n > 1 adds
+-- " (n)". The clip's real name lives in the file; M.clipSavePath picks n so files never collide.
+function Clip.fileName(name, n)
+  local stem = name:gsub('[%c/\\:*?"<>| ]', "_"):gsub("^%.", "_"):gsub("%.$", "_")
+  -- Windows refuses device names such as "con.json" or "nul.x.json".
+  if DEVICES[stem:match("^[^.]*"):lower()] then stem = "_" .. stem end
+  if n and n > 1 then stem = stem .. " (" .. n .. ")" end
   return stem .. ".json"
 end
 

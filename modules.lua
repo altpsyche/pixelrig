@@ -76,17 +76,29 @@ return function(dir)
 
   -- Where saving a clip named `name` writes, and what that replaces: nil when nothing, else a
   -- short phrase for the question. An existing user clip is saved over its own file, so the saved
-  -- clip is the one the library shows afterwards; any other name gets Clip.fileName, where a file
-  -- may already sit (on a disk that ignores case, an older file differing only in case).
+  -- clip is the one the library shows afterwards. Any other name gets Clip.fileName, numbered past
+  -- every file holding another clip or none; names are compared lowercased, as a disk that ignores
+  -- case would. A file there holding this very name (one that did not load) is replaced.
   function M.clipSavePath(lib, name)
     local have = lib.clips[name]
     if have and have.origin == "user" then return have.file, "your clip '" .. name .. "'" end
-    local path = app.fs.joinPath(M.userClipsDir(), M.Clip.fileName(name))
-    if not app.fs.isFile(path) then return path, nil end
-    local ok, data = pcall(M.Util.readJson, path)
-    local held = ok and type(data) == "table" and type(data.name) == "string" and data.name
-    if held then return path, "your clip '" .. held .. "' (" .. app.fs.fileName(path) .. ")" end
-    return path, "the file " .. app.fs.fileName(path)
+    local folder = M.userClipsDir()
+    local taken = {}
+    if app.fs.isDirectory(folder) then
+      for _, file in ipairs(app.fs.listFiles(folder)) do taken[file:lower()] = file end
+    end
+    local n = 1
+    while true do
+      local file = M.Clip.fileName(name, n)
+      local there = taken[file:lower()]
+      if not there then return app.fs.joinPath(folder, file), nil end
+      local path = app.fs.joinPath(folder, there)
+      local ok, data = pcall(M.Util.readJson, path)
+      if ok and type(data) == "table" and data.name == name then
+        return path, "your clip '" .. name .. "' (" .. there .. ")"
+      end
+      n = n + 1
+    end
   end
 
   M.Sections = mod("sections")

@@ -304,7 +304,7 @@ other:close()
 -- save clip
 set("clipName", "Run test")
 click("saveClip")
-local savedFile = app.fs.joinPath(M.userClipsDir(), "^run test.json")
+local savedFile = app.fs.joinPath(M.userClipsDir(), "Run_test.json")
 check(app.fs.isFile(savedFile), "clip saved to user dir")
 check(widgets.clip.value == "Run test", "clip combobox switched to saved clip")
 
@@ -348,6 +348,10 @@ do
   check(#alerts == n0, "new names save without asking (" .. (#alerts - n0) .. " alerts)")
   check(hasName("Run test") and hasName("Run/test") and hasName("日本") and hasName("中文"),
         "colliding and non-ASCII names are separate clips")
+  local lib = M.loadLibrary()
+  check(lib.clips["Run test"].file == savedFile
+        and lib.clips["Run/test"].file == app.fs.joinPath(M.userClipsDir(), "Run_test (2).json"),
+        "'Run/test' beside 'Run test' saved as Run_test (2).json")
 
   -- A failed write shows a message instead of raising.
   local userDir = M.userClipsDir
@@ -359,7 +363,7 @@ do
   M.userClipsDir = userDir
   os.remove(notDir)
   check(okClick, "failed write does not raise " .. tostring(err or ""))
-  check(#alerts == n0 + 1 and tostring(alerts[#alerts]):find("Could not save clip 'Elsewhere': ^elsewhere.json: ", 1, true) ~= nil,
+  check(#alerts == n0 + 1 and tostring(alerts[#alerts]):find("Could not save clip 'Elsewhere': Elsewhere.json: ", 1, true) ~= nil,
         "failed write shows a message: " .. tostring(alerts[#alerts]))
   check(widgets.clip.value == "中文", "failed write keeps the current clip")
   rawset(app, "alert", nil)
