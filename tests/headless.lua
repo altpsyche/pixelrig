@@ -140,6 +140,14 @@ do
     if s.file == "b-old.json" and s.reason:find("a-old.json", 1, true) then listed = true end
   end
   check(listed, "library: the shadowed duplicate is listed as skipped")
+  -- A user clip named like a built-in is listed too, not dropped without a word.
+  put("my-run.json", "Run", 13)
+  local builtinDup = false
+  for _, sk in ipairs(M.loadLibrary().skipped) do
+    if sk.file == "my-run.json" and sk.reason == "same clip name as a built-in" then builtinDup = true end
+  end
+  os.remove(app.fs.joinPath(dir, "my-run.json"))
+  check(builtinDup, "library: a user clip named like a built-in is listed as skipped")
   check(dup and Clip.export(dup).file == nil and Clip.export(dup).origin == nil, "export drops runtime fields")
 
   -- Saving over an existing user clip writes its own file; a new name gets the encoded file.

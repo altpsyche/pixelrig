@@ -18,7 +18,7 @@ return function(dir)
 
   function M.rigsDir() return app.fs.joinPath(dir, "rigs") end
 
-  -- Built-in clips + user clips. A user clip named like a built-in is left out; of two user files
+  -- Built-in clips + user clips. A user clip named like a built-in is skipped; of two user files
   -- with one clip name, the first by file name loads and the other is skipped.
   -- A file that cannot be used is left out and listed in lib.skipped as { file, origin, reason },
   -- the reason one short line for the artist; loading itself never raises.
@@ -55,10 +55,12 @@ return function(dir)
             skip(tostring(clip))
           elseif rigReason then
             skip(rigReason)
-          elseif have and origin == "user" and have.origin == "user" then
+          elseif have and origin == "user" and have.origin == "builtin" then
+            skip("same clip name as a built-in")
+          elseif have and origin == "user" then
             -- Never let a second file silently replace the first (#7).
             skip("same clip name as " .. app.fs.fileName(have.file))
-          elseif not (have and have.origin == "builtin") then
+          elseif not have or have.origin ~= "builtin" then
             if not have then table.insert(lib.names, clip.name) end
             clip.file = path
             lib.clips[clip.name] = clip
