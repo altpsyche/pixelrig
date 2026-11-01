@@ -553,5 +553,41 @@ do
   spr:close()
 end
 
+-- A ghost whose tag was renamed or deleted is still listed, as an orphan, and Remove clears it.
+do
+  local spr = Sprite(64, 64, ColorMode.RGB)
+  for f = 2, 6 do spr:newEmptyFrame(f) end
+  local art = spr.layers[1]
+  local walk = spr:newTag(1, 3); walk.name = "walk"
+  local jump = spr:newTag(4, 6); jump.name = "jump"
+  local s = function(scope) return settings { scope = scope, frames = 3, height = 40, groundY = 60, cx = 32 } end
+  check(Ghost.apply(spr, s("walk"), lib.clips.Run, rig) == nil and Ghost.apply(spr, s("jump"), lib.clips.Run, rig) == nil,
+        "orphans: apply on two tags")
+  walk.name = "stride"
+  spr:deleteTag(jump)
+  local list = Ghost.scopes(spr)
+  check(#list == 4 and list[1] == Ghost.ALL and list[2] == "stride", "orphans: scopes list live tags first (" .. table.concat(list, ", ") .. ")")
+  local wl, jl = Ghost.scopeLabel(spr, "walk"), Ghost.scopeLabel(spr, "jump")
+  check(wl ~= "walk" and wl:find("walk", 1, true) == 1 and jl ~= "jump"
+        and ((list[3] == jl and list[4] == wl) or (list[3] == wl and list[4] == jl)),
+        "orphans: renamed and deleted tags' ghosts are listed (" .. tostring(wl) .. ", " .. tostring(jl) .. ")")
+  check(Ghost.scopeFor(spr, wl) == "walk" and Ghost.scopeFor(spr, "stride") == "stride" and Ghost.scopeFor(spr, Ghost.ALL) == Ghost.ALL,
+        "orphans: a label maps back to its scope")
+  local frames = #spr.frames
+  check(Ghost.apply(spr, s("walk"), lib.clips.Run, rig) ~= nil and #ghostLayers(spr) == 2 and #spr.frames == frames,
+        "orphans: apply on an orphan writes nothing")
+  app.sprite = spr; app.layer = art; app.frame = 5
+  Ghost.remove(spr, "walk")
+  Ghost.remove(spr, "jump")
+  check(app.layer == art and app.frame.frameNumber == 5 and #spr.frames == frames,
+        "orphans: remove keeps the artist's layer and frame and the frames")
+  local rest = Ghost.scopes(spr)
+  check(#ghostLayers(spr) == 0 and #rest == 2, "orphans: remove clears both (" .. table.concat(rest, ", ") .. ")")
+  local tags = {}
+  for _, t in ipairs(spr.tags) do table.insert(tags, t.name) end
+  check(#tags == 1 and tags[1] == "stride", "orphans: only the artist's tag is left (" .. table.concat(tags, ", ") .. ")")
+  spr:close()
+end
+
 print(failures == 0 and "ALL PASSED" or (failures .. " FAILED"))
 if failures > 0 then error(failures .. " test(s) failed") end

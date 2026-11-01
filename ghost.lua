@@ -29,6 +29,33 @@ return function(Clip, Rig, Render, Colors, Util)
     return (tag.data or ""):find(Ghost.MARK, 1, true) == 1
   end
 
+  local function findTag(sprite, name)
+    for _, tag in ipairs(sprite.tags) do
+      if tag.name == name and not isGhostTag(tag) then return tag end
+    end
+    return nil
+  end
+
+  -- An orphaned ghost's scope names a tag that was renamed or deleted (#6). The Range list shows
+  -- it under this suffix, so the artist can still pick it and Remove it.
+  Ghost.ORPHAN = " (tag gone)"
+
+  local function isOrphan(sprite, scope)
+    return scope ~= Ghost.ALL and not findTag(sprite, scope)
+  end
+
+  -- The one-line note for Apply on a range whose tag is gone.
+  function Ghost.rangeGone(scope)
+    return "Tag '" .. scope .. "' is gone. Pick another range, or Remove its ghost."
+  end
+
+  -- The Range list's text for scope: the scope itself, or for an orphan, scope .. Ghost.ORPHAN.
+  function Ghost.scopeLabel(sprite, scope)
+    return isOrphan(sprite, scope) and (scope .. Ghost.ORPHAN) or scope
+  end
+
+  -- What the Range list shows: All frames, every artist tag, then every orphaned ghost's label
+  -- in layer order, once each.
   function Ghost.scopes(sprite)
     local list = { Ghost.ALL }
     for _, tag in ipairs(sprite.tags) do
@@ -36,14 +63,27 @@ return function(Clip, Rig, Render, Colors, Util)
         table.insert(list, tag.name)
       end
     end
+    local seen = {}
+    for _, layer in ipairs(Ghost.layers(sprite)) do
+      local scope = Ghost.layerScope(layer)
+      if not seen[scope] and isOrphan(sprite, scope) then
+        seen[scope] = true
+        table.insert(list, Ghost.scopeLabel(sprite, scope))
+      end
+    end
     return list
   end
 
-  local function findTag(sprite, name)
-    for _, tag in ipairs(sprite.tags) do
-      if tag.name == name and not isGhostTag(tag) then return tag end
+  -- The scope a Range label stands for: a label Ghost.scopes lists for an orphan maps back to the
+  -- orphan's scope; anything else is a scope already.
+  function Ghost.scopeFor(sprite, label)
+    if label == Ghost.ALL or findTag(sprite, label) then return label end
+    local n = #Ghost.ORPHAN
+    if label:sub(-n) == Ghost.ORPHAN then
+      local scope = label:sub(1, -n - 1)
+      if isOrphan(sprite, scope) and Ghost.findLayer(sprite, scope) then return scope end
     end
-    return nil
+    return label
   end
 
   -- First/last frame numbers of a scope, or nil if the tag is gone.
@@ -361,7 +401,7 @@ return function(Clip, Rig, Render, Colors, Util)
   -- and frame as they were. Returns error string or nil.
   function Ghost.apply(sprite, s, clip, baseRig)
     local first, last = Ghost.scopeRange(sprite, s.scope)
-    if not first then return "Tag '" .. s.scope .. "' not found" end
+    if not first then return Ghost.rangeGone(s.scope) end
     local note = Ghost.cannotDraw(sprite)
     if note then return note end
     local build = Ghost.build(s, clip, baseRig)
