@@ -52,13 +52,18 @@ return function(M)
       return pcall(function() return sprite.width end)
     end
 
+    -- Fit to art for this dialog's sprite at the current frame (Ghost.fitToArt), or nil.
+    local function fitArt()
+      return Ghost.fitToArt(sprite, app.frame and app.frame.frameNumber or 1)
+    end
+
     local function defaultsFor(scope)
       local s = Util.deepCopy(Ghost.DEFAULTS)
       s.scope = scope
       s.height = max(8, floor(sprite.height * 0.8))
       s.groundY = sprite.height - 1
       s.cx = sprite.width // 2
-      local fit = Ghost.fitToArt(sprite, app.frame and app.frame.frameNumber or 1)
+      local fit = fitArt()
       if fit then s.height, s.groundY, s.cx = fit.height, fit.groundY, fit.cx end
       if scope ~= Ghost.ALL then
         local a, b = Ghost.scopeRange(sprite, scope)
@@ -433,7 +438,7 @@ return function(M)
 
     local function onFit()
       if not alive() then return end
-      local fit = Ghost.fitToArt(sprite, app.frame and app.frame.frameNumber or 1)
+      local fit = fitArt()
       if not fit then
         app.alert("No art found: select an area or draw on a layer first.")
         return
