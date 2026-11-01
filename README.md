@@ -72,7 +72,7 @@ Skeleton proportions live in `rigs/<name>.json`, normalized to standing height.
 | `modules.lua` | Module loader, clip library (built-in + user) |
 | `ui.lua` | Dialog: preview canvas, transport, sections, pose dragging |
 | `sections.lua` | Dialog sections: tabs where Aseprite has them, a section picker on older builds (v1.3-rc6) |
-| `ghost.lua` | Build frames, travel/foot lock, render, apply, scopes, persistence, fit, preview composite |
+| `ghost.lua` | Build frames, travel/foot lock, render, apply, scopes, persistence, fit, preview composite (Aseprite's renderer) |
 | `clip.lua` | Clip sampling, param mods, key pose easing, key editing |
 | `rig.lua` | Side-view FK, ground solve, proportion presets |
 | `render.lua` | Rasterizer: chains, pixel-perfect, capsules, styles, footprints |
