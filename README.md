@@ -57,7 +57,7 @@ A motion is one JSON file. Built-ins live in `clips/`; saved clips go to `<asepr
 - `params`: sliders that `scale` or `add` to named channels
 - `marks`: key poses `{ t, name, ease }`; become one-frame tags; `ease` shapes spacing to the next mark
 
-A clip file that cannot be used (for example: not valid JSON, no `rig` or a rig that is missing or unreadable, a channel without `keys`, a param without `channels`) is left out of the library, and the rest still load.
+A clip file that cannot be used (for example: not valid JSON, no `rig` or a rig that is missing or unreadable, a channel without `keys`, a param without `channels`) is left out of the library, and the rest still load. The dialog names the first skipped file and why on one **Skipped** line under Clip (the Motion tab, or the Motion section on Aseprite builds without tabs), with a count of any others.
 
 Skeleton proportions live in `rigs/<name>.json`, normalized to standing height.
 

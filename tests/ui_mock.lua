@@ -119,6 +119,14 @@ end
 -- Run --------------------------------------------------------------------------
 local M = dofile(root .. "/modules.lua")(root)
 M.userClipsDir = function() return app.fs.joinPath(out, "userclips") end
+-- A user clip naming a rig that does not exist: skipped, and the dialog says why (#4).
+local brokenClip = app.fs.joinPath(M.userClipsDir(), "broken.json")
+do
+  app.fs.makeAllDirectories(M.userClipsDir())
+  local data = M.Util.readJson(app.fs.joinPath(root, "clips", "run.json"))
+  data.name, data.rig = "Broken", "nope"
+  M.Util.writeJson(brokenClip, data)
+end
 
 -- Timers are mocked: flush change debounce by calling ontick directly.
 local spr = Sprite(64, 64, ColorMode.RGB)
@@ -137,6 +145,9 @@ local openedMotionOnly = widgets.clip.visible and not (widgets.param1.visible or
   or widgets.ease.visible)
 
 check(widgets.height.value == 40 and widgets.groundY.value == 59, "auto-fit on first open")
+check(widgets.skipped and widgets.skipped.visible
+      and widgets.skipped.value == "broken.json: rig 'nope' not found",
+      "skipped clip reason shown on one line: " .. tostring(widgets.skipped and widgets.skipped.value))
 -- (in picker mode the sliders sit in the Clip section, checked below)
 check((NOTABS or (widgets.param1.visible == true and widgets.param6.visible == false))
       and widgets.param1.label == "Stride %" and widgets.param1.value == 100,
@@ -185,7 +196,7 @@ if NOTABS then
   check(openedMotionOnly, "no tabs: the dialog opens on the Motion section only")
   -- Every section shows exactly its own controls.
   local SECTIONS = {
-    Motion = { "clip", "scope", "frames", "fps", "fillAll", "timing", "labels" },
+    Motion = { "clip", "skipped", "scope", "frames", "fps", "fillAll", "timing", "labels" },
     Clip = { "param1", "param2", "param3", "param4", "param5" },
     Travel = { "travel", "travelSpeed", "footprints", "groundLine" },
     Body = { "preset", "pHead", "pTorso", "pArms", "pLegs", "pBulk", "facing" },
@@ -265,10 +276,12 @@ click("apply")
 check(M.Ghost.findLayer(spr, "idle") ~= nil, "tag ghost applied")
 
 -- reopen restores settings for All frames
+os.remove(brokenClip)
 for k in pairs(widgets) do widgets[k] = nil end
 app.layer = layer
 M.UI.open()
 check(widgets.style.value == "Joints + arcs" and widgets.colorScheme.value == "Segments", "reopen restores settings")
+check(not widgets.skipped.visible, "no skipped line when every clip loads")
 
 click("remove")
 check(M.Ghost.findLayer(spr, M.Ghost.ALL) == nil, "remove ghost")

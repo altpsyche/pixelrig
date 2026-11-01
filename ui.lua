@@ -18,6 +18,17 @@ return function(M)
     return names
   end
 
+  -- One line naming the first clip file left out of the library and why; nil if none was.
+  local function skippedText(lib)
+    local first = lib.skipped[1]
+    if not first then return nil end
+    -- Capped so a long file or channel name cannot widen the dialog.
+    local text = first.file .. ": " .. first.reason
+    if #text > 48 then text = text:sub(1, 45) .. "..." end
+    if #lib.skipped > 1 then text = text .. string.format(" (+%d more)", #lib.skipped - 1) end
+    return text
+  end
+
   local function nearAngle(v, old)
     if not old then return v end
     while v - old > 180 do v = v - 360 end
@@ -34,7 +45,8 @@ return function(M)
 
     local lib = M.loadLibrary()
     if #lib.names == 0 then
-      app.alert("No clips found.")
+      local why = skippedText(lib)
+      app.alert(why and ("No usable clips. " .. why) or "No clips found.")
       return
     end
 
@@ -335,6 +347,12 @@ return function(M)
     end
 
     -- Widget sync ------------------------------------------------------------
+    local function refreshSkipped()
+      local text = skippedText(lib)
+      dlg:modify { id = "skipped", text = text or "" }
+      sec:setVisible("skipped", text ~= nil)
+    end
+
     local function refreshParams()
       local values = S.params[work.name] or {}
       for i = 1, MAXP do
@@ -459,6 +477,7 @@ return function(M)
       Util.writeJson(app.fs.joinPath(dir, name:gsub("[^%w%-_ ]", "_") .. ".json"), data)
       local oldName = work.name
       lib = M.loadLibrary()
+      refreshSkipped()
       work = Clip.clone(lib.clips[name])
       S.params[name] = Util.deepCopy(S.params[oldName] or {})
       S.clip, S.clipData, dirty = name, nil, false
@@ -528,6 +547,7 @@ return function(M)
 
     sec:begin("secMotion")
     W:combobox { id = "clip", label = "Clip", option = work.name, options = lib.names, onchange = onClipChange }
+    W:label { id = "skipped", label = "Skipped", text = "", visible = false }
     W:combobox { id = "scope", label = "Range", option = S.scope, options = Ghost.scopes(sprite), onchange = onScopeChange }
     W:slider { id = "frames", label = "Frames", min = 2, max = 48, value = S.frames, onchange = changed }
     W:slider { id = "fps", label = "FPS", min = 1, max = 60, value = S.fps, onchange = changed }
@@ -604,6 +624,7 @@ return function(M)
 
     refreshParams()
     refreshColors()
+    refreshSkipped()
     pull()
     rebuild()
     dlg:show { wait = false }
