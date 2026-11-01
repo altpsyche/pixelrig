@@ -91,16 +91,14 @@ has confirmed the spec's testing seams.
    (§ Roles).
 8. Evals, so a skill change is proven like code: when the diff touches `.agents/skills/<name>/`,
    run every case in `evals/<name>/`; when it touches `AGENTS.md`, every case in `evals/`, unless
-   it changes only the list of checks. That list is the text in `AGENTS.md` § Verifying your work
-   from `It checks` up to, not including, the sentence that starts `CI has no Aseprite`, which
-   names what `scripts/verify.sh` runs and changes with every new check. The exception holds when
-   `git diff --word-diff <base> -- AGENTS.md`, with `<base>` the PR's base (`origin/main`, or a
-   sub-PR's per § 3), marks every added or removed word inside that list; it does not mark text
-   only rewrapped. Any other change to `AGENTS.md`, that sentence and the rest of the section
-   included, still runs every case. Run each, and have another session grade it, per
+   it changes only the list of checks in `AGENTS.md` § Verifying your work: the text from
+   `It checks` up to, not including, the sentence that starts `CI has no Aseprite`. It does when
+   `git -C <worktree> diff --word-diff <base>...HEAD -- AGENTS.md`, with `<base>` the PR's base
+   (`origin/main`, or a sub-PR's per § 3), marks no word outside that list; text only rewrapped
+   is not marked. Run each, and have another session grade it, per
    [`evals/README.md`](../evals/README.md). A skill with no folder in `evals/` has no case to run.
-   A grade holds for the commit it ran on: a later commit this step covers, in a fix round too,
-   needs a fresh run.
+   A grade holds for the commit it ran on: a later commit to those paths, in a fix round too,
+   needs a fresh run, except one whose only change to them is to that list.
 9. **Open a PR** whose body, written by `/pr` with its Evidence per **Evidence**, says
    `Closes #<n>`, labelled `status:in-review`. Without that label no Reviewer finds it.
 
@@ -215,7 +213,7 @@ and PR steps.
    dispute: the answer names the ruling, and where and when the owner gave it. The Reviewer cannot
    verify it, so the finding waits on the owner, per § 3, **Relayed owner rulings**. A constitution
    violation never waits: no relayed ruling answers it, so it is fixed or disputed. A fix that
-   touches an eval case's paths reruns that case, per § 2, step 8.
+   § 2, step 8 says needs a fresh run of an eval case reruns that case.
 5. **Return a PR for review**. Its comment answers each finding: fixed in `<sha>`, naming the test
    for a behaviour change, disputed with a reason and a source, or answered with a relayed owner
    ruling. A finding already waiting on the owner from an earlier round is listed as still waiting.
@@ -291,7 +289,8 @@ Applied in full on every review. Each line is a hard rule, not a judgement call.
 - Every acceptance criterion has an entry in the PR's `## Evidence`, per **Evidence** in
   [`docs/agents/issue-tracker.md`](agents/issue-tracker.md). A criterion without one is a finding.
 - Every eval case § 2, step 8 requires has a passing grade in the PR's `## Evidence`, run on the
-  last commit that touched its paths. A missing, failing or stale grade is a finding.
+  last commit to its paths that step 8 does not exempt. A missing, failing or stale grade is a
+  finding.
 - A behaviour change has a check that fails without it. Name the check.
 - No check asserts an implementation detail, and no expected value is recomputed the way the work
   computes it.
