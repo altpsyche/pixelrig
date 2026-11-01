@@ -275,6 +275,17 @@ return function(M)
       dlg:repaint()
     end
 
+    -- While playing, a new FPS sets the play speed at once (#8); restarting counts the new
+    -- interval from now.
+    local function onFps()
+      if playing then
+        playTimer:stop()
+        playTimer.interval = 1 / max(1, dlg.data.fps)
+        playTimer:start()
+      end
+      changed()
+    end
+
     local function stopPlay()
       if playing then
         playing = false
@@ -603,7 +614,7 @@ return function(M)
     W:label { id = "skipped", label = "Skipped", text = "", visible = false }
     W:combobox { id = "scope", label = "Range", option = S.scope, options = Ghost.scopes(sprite), onchange = onScopeChange }
     W:slider { id = "frames", label = "Frames", min = 2, max = 48, value = S.frames, onchange = changed }
-    W:slider { id = "fps", label = "FPS", min = 1, max = 60, value = S.fps, onchange = changed }
+    W:slider { id = "fps", label = "FPS", min = 1, max = 60, value = S.fps, onchange = onFps }
     W:check { id = "fillAll", label = "Frames", text = "Loop over range", selected = S.fillAll, onclick = changed }
     W:check { id = "labels", text = "Key pose tags", selected = S.labels, onclick = changed }
     -- Both change the artist's timeline, so both are opt-in and off by default (ADR-0005).

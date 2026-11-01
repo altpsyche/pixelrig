@@ -84,9 +84,12 @@ setmetatable(mock, { __index = function(_, k)
 end })
 
 Dialog = function(t) mock._onclose = t.onclose; return mock end
+local timers = {}
 Timer = function(t)
-  return { interval = t.interval, running = false, ontick = t.ontick,
-           start = function(self) self.running = true; self.ontick() end, stop = function(self) self.running = false end }
+  local timer = { interval = t.interval, running = false, ontick = t.ontick,
+                  start = function(self) self.running = true; self.ontick() end, stop = function(self) self.running = false end }
+  table.insert(timers, timer)
+  return timer
 end
 
 local function setRaw(id, v)
@@ -316,6 +319,18 @@ set("style", "Joints + arcs"); set("travel", true)
 -- frame transport
 click("next"); click("prev"); click("play"); click("play")
 check(true, "transport buttons ok")
+
+-- FPS changed while playing sets the play speed at once, not at the next Play (#8).
+do
+  click("play")
+  local play
+  for _, t in ipairs(timers) do if t.running then play = t end end
+  set("fps", 24)
+  check(play and play.running and math.abs(play.interval - 1 / 24) < 1e-9,
+        "an FPS change while playing sets the play timer to it (" .. tostring(play and play.interval) .. " s)")
+  click("play")
+  set("fps", 12)
+end
 
 -- fit, with the Boots layer still active
 check(app.layer == boots and widgets.height.value ~= 40, "fit button starts from a changed height")
