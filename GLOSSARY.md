@@ -11,11 +11,11 @@ pixels.
 _Avoid_: animation (that is the artist's frames), motion file
 
 **Channel**:
-One animated value of a clip, such as `leg.thigh`, keyed over cycle time `t ∈ [0, 1)`.
+One animated value of a clip, such as the thigh's angle, keyed over the clip's cycle.
 _Avoid_: track, curve
 
 **Sided channel**:
-A channel authored for the near limb; the far limb samples the same curve `sideOffset` later, so
+A channel authored for the near limb; the far limb replays the same curve offset in time, so
 editing one side edits both.
 
 **Key**:
@@ -25,7 +25,7 @@ _Avoid_: keyframe (ambiguous with Aseprite frames)
 **Key pose**:
 A named moment of a whole clip (`contact`, `pass`) that owns the spacing (ease) until the next key
 pose; it becomes a one-frame tag.
-_Avoid_: mark (in prose; `marks` stays the clip-file field name), keyframe
+_Avoid_: mark, keyframe
 
 **Param**:
 A clip-declared slider that scales or offsets channels (stride, bounce).
@@ -50,11 +50,11 @@ The rendered guide figure, drawn over the artist's art.
 _Avoid_: onion skin, reference image
 
 **Ghost layer**:
-The reference layer that holds a ghost, marked `pixelrig-ghost`, never exported.
+The reference layer that holds a ghost. PixelRig owns it, and it is never exported.
 
 **Range**:
 Where a PixelRig tool works: all frames, or one tag. One ghost layer per range.
-_Avoid_: scope (in prose; `scope` stays the settings field name), selection
+_Avoid_: scope, selection
 
 **Build**:
 Every frame of a cycle solved and placed for given settings.
@@ -87,8 +87,8 @@ drawing; PixelRig never merges or splits them.
 _Avoid_: cel (that is one layer's image in a frame), keyframe
 
 **Base rate**:
-The sprite's timing grid in base frames per second, stored per sprite; default 12.
-_Avoid_: FPS (in prose; the ghost's FPS field shows the base rate)
+The sprite's timing grid: how many base frames make one second. Each sprite has its own.
+_Avoid_: FPS
 
 **Base frame**:
 One tick of the base rate (at 12, 1000/12 ≈ 83 ms).
@@ -98,15 +98,13 @@ How many base frames a drawing is held: a whole number, 1 or more. "On 2s" means
 _Avoid_: hold count, frame count
 
 **Off-grid**:
-A drawing whose duration is not a whole number of base frames; shown at its nearest exposure and
-flagged, and left as it is until the artist edits it.
+A drawing whose duration is not a whole number of base frames.
 
 **Hold**:
 An exposure longer than the drawings around it, usually on a key drawing.
 
 **Drawing role**:
-What a drawing is in the animation: key, breakdown, or inbetween (the default). Stored on the
-timing layer.
+What a drawing is in the animation: key, breakdown, or inbetween (the default).
 _Avoid_: mark (that is a clip key pose), drawing type
 
 **Exposure sheet**:
@@ -114,5 +112,5 @@ The PixelRig tool that shows and edits each drawing's exposure and drawing role 
 _Avoid_: dope sheet, X-sheet, timeline
 
 **Timing layer**:
-The hidden reference layer `PixelRig: timing` that holds drawing roles, one cel per drawing that has
-a role.
+The hidden layer PixelRig owns that holds the drawing roles of a sprite, so that each role stays
+with its drawing.

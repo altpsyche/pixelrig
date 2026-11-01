@@ -7,11 +7,8 @@ How the engineering skills consume this project's domain documentation. This rep
 
 - **[`AGENTS.md`](../../AGENTS.md)** — conventions, anti-patterns, the ADR index, and the precedence
   order to apply when sources disagree.
-- **[`docs/idea.md`](../idea.md) § Core Concepts** — the authoritative vocabulary until
-  `GLOSSARY.md` exists.
-- **`GLOSSARY.md`** at the repo root, *if it exists*. It is created lazily by `/domain-modeling` the
-  first time a term is resolved. If it does not exist, **proceed silently**: do not flag its absence
-  and do not create it upfront.
+- **[`GLOSSARY.md`](../../GLOSSARY.md)** at the repo root — the authoritative vocabulary, kept by
+  `/domain-modeling`. `docs/idea.md` § Core Concepts points to it.
 - **[`docs/adr/`](../adr/)** — read the ADRs that touch the area you are about to work in.
 - **The co-located `.md`** beside the work you touch, which describes how that part works.
 - **[`docs/specs/`](../specs/)** — what was agreed to be built, and its testing seams.
@@ -19,7 +16,7 @@ How the engineering skills consume this project's domain documentation. This rep
 ## Use the glossary's vocabulary
 
 When your output names a domain concept (an issue title, a test name, a type name), use the term as
-`docs/idea.md` § Core Concepts and the work define it. Do not drift to synonyms. If a synonym is
+`GLOSSARY.md` and the work define it. Do not drift to synonyms. If a synonym is
 genuinely better, `/domain-modeling` changes the model and the vocabulary together, in one commit.
 
 Distinctions agents most often blur:
