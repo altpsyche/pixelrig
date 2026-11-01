@@ -91,7 +91,7 @@ dialog through a mock `Dialog`.
 
 - Run cycle ghost with preview, pose editing, travel, proportions, color schemes (shipped as
   `v0.0.1-alpha`)
-- Confirm the dialog in the real Aseprite UI
+- Confirm the dialog in the real Aseprite UI (done: owner-checked, #16)
 
 ### Phase 2 — Motion library
 
@@ -123,6 +123,5 @@ dialog through a mock `Dialog`.
 
 - Oldest Aseprite version supported. Tested only on a source build (Lua API 41).
 - Clip format for one-shot motions: one `loop: false` flag, or a separate clip kind?
-- Whether the repo goes public, and when (MIT and open source are decided; visibility is not).
 - Data model for 4/8 directions: one rig with per-direction projection, or one rig per direction?
 - Gate for pixel ops: what cleanup-time result unlocks cutout rig and retarget bakes?
