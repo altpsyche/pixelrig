@@ -14,8 +14,8 @@ else
   echo "verify: luac not found, Lua syntax check skipped (CI runs it)" >&2
 fi
 
-# Pure-Lua tests (tests/pure.lua): clip, rig, stamps, colors and render under plain Lua 5.4, no
-# Aseprite, so CI runs them (#12). Only a Lua 5.4 interpreter, as Aseprite embeds.
+# Pure-Lua tests (tests/pure.lua; its header lists what they cover): no Aseprite, so CI runs them
+# (#12). Only a Lua 5.4 interpreter, as Aseprite embeds.
 lua_bin="$(command -v lua5.4 || true)"
 if [ -z "$lua_bin" ] && command -v lua >/dev/null && [ "$(lua -e 'io.write(_VERSION)')" = "Lua 5.4" ]; then
   lua_bin="$(command -v lua)"
@@ -60,27 +60,34 @@ else
   echo "verify: zip/unzip not found, package check skipped (CI runs it)" >&2
 fi
 
-# Self-test: tools/test.sh runs every Aseprite suite and fails at the end when any failed, so one
-# failure never hides another (#12). A stub aseprite fails every suite and logs which it ran.
+# Self-test: tools/test.sh runs every Aseprite suite and fails at the end when any failed, naming
+# each, so one failure never hides another (#12); with every suite passing it passes. A stub
+# aseprite logs each suite it runs and fails them all when STUB_FAIL is set.
 stub="$(mktemp -d)"
+trap 'rm -rf "$stub"' EXIT
 cat >"$stub/aseprite" <<'STUB'
 #!/usr/bin/env bash
 echo "$*" >>"$(dirname "$0")/ran.log"
-echo "FAIL stub suite"
-exit 1
+[ -z "${STUB_FAIL:-}" ]
 STUB
 chmod +x "$stub/aseprite"
-if tools/test.sh "$stub/aseprite" "$stub/out" >/dev/null 2>&1; then
+if ! tools/test.sh "$stub/aseprite" "$stub/out" >/dev/null 2>&1; then
+  echo "verify: tools/test.sh failed although every Aseprite suite passed" >&2
+  exit 1
+fi
+rm -f "$stub/ran.log"
+if failed="$(STUB_FAIL=1 tools/test.sh "$stub/aseprite" "$stub/out" 2>&1 >/dev/null)"; then
   echo "verify: tools/test.sh passed although every Aseprite suite failed" >&2
   exit 1
 fi
 ran="$(cat "$stub/ran.log" 2>/dev/null || true)"
-if [ "$(grep -c 'headless\.lua' <<<"$ran")" != 1 ] || [ "$(grep -c 'ui_mock\.lua' <<<"$ran")" != 2 ]; then
-  echo "verify: tools/test.sh stopped before running every Aseprite suite; it ran:" >&2
+if [ "$(grep -c 'headless\.lua' <<<"$ran")" != 1 ] || [ "$(grep -c 'ui_mock\.lua' <<<"$ran")" != 2 ] ||
+  [ "$(grep -c '^FAIL suite ' <<<"$failed")" != 3 ]; then
+  echo "verify: tools/test.sh did not run and report every failing Aseprite suite; it ran:" >&2
   echo "${ran:-nothing}" >&2
+  echo "and reported: ${failed:-nothing}" >&2
   exit 1
 fi
-rm -rf "$stub"
 
 # Aseprite batch tests: build, render, apply (tests/headless.lua) and the dialog through a mock
 # (tests/ui_mock.lua). Needs an Aseprite binary: $ASEPRITE, or aseprite on PATH. CI has none.
