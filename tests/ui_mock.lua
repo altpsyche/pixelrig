@@ -119,6 +119,14 @@ end
 -- Run --------------------------------------------------------------------------
 local M = dofile(root .. "/modules.lua")(root)
 M.userClipsDir = function() return app.fs.joinPath(out, "userclips") end
+-- A user clip naming a rig that does not exist: skipped, and the dialog says why (#4).
+local brokenClip = app.fs.joinPath(M.userClipsDir(), "broken.json")
+do
+  app.fs.makeAllDirectories(M.userClipsDir())
+  local data = M.Util.readJson(app.fs.joinPath(root, "clips", "run.json"))
+  data.name, data.rig = "Broken", "nope"
+  M.Util.writeJson(brokenClip, data)
+end
 
 -- Timers are mocked: flush change debounce by calling ontick directly.
 local spr = Sprite(64, 64, ColorMode.RGB)
@@ -144,6 +152,9 @@ local openedMotionOnly = widgets.clip.visible and not (widgets.param1.visible or
   or widgets.ease.visible)
 
 check(widgets.height.value == 40 and widgets.groundY.value == 59, "auto-fit on first open")
+check(widgets.skipped and widgets.skipped.visible
+      and widgets.skipped.value == "broken.json: rig 'nope' not found",
+      "skipped clip reason shown on one line: " .. tostring(widgets.skipped and widgets.skipped.value))
 check(widgets.fit.t.text == "Fit to art (selection, else all visible art)",
       "fit button says what it measures: " .. tostring(widgets.fit.t.text))
 -- (in picker mode the sliders sit in the Clip section, checked below)
@@ -194,7 +205,7 @@ if NOTABS then
   check(openedMotionOnly, "no tabs: the dialog opens on the Motion section only")
   -- Every section shows exactly its own controls.
   local SECTIONS = {
-    Motion = { "clip", "scope", "frames", "fps", "fillAll", "timing", "labels" },
+    Motion = { "clip", "skipped", "scope", "frames", "fps", "fillAll", "timing", "labels" },
     Clip = { "param1", "param2", "param3", "param4", "param5" },
     Travel = { "travel", "travelSpeed", "footprints", "groundLine" },
     Body = { "preset", "pHead", "pTorso", "pArms", "pLegs", "pBulk", "facing" },
@@ -275,10 +286,76 @@ click("apply")
 check(M.Ghost.findLayer(spr, "idle") ~= nil, "tag ghost applied")
 
 -- reopen restores settings for All frames
+os.remove(brokenClip)
 for k in pairs(widgets) do widgets[k] = nil end
 app.layer = layer
 M.UI.open()
 check(widgets.style.value == "Joints + arcs" and widgets.colorScheme.value == "Segments", "reopen restores settings")
+check(not widgets.skipped.visible, "no skipped line when every clip loads")
+
+-- Corrupt settings on the ghost layer: the dialog still opens, with defaults (#4).
+local function reopenWith(text)
+  layer.properties("pixelrig").settings = text
+  click("close")
+  for k in pairs(widgets) do widgets[k] = nil end
+  app.layer = layer
+  local opened, why = pcall(M.UI.open)
+  return opened, why
+end
+for _, text in ipairs({ "[1, 2]", "42", "null" }) do
+  local opened, why = reopenWith(text)
+  check(opened and widgets.style.value == M.Ghost.DEFAULTS.style and widgets.clip.value == "Run",
+        "corrupt settings " .. text .. " -> opens with defaults " .. tostring(why or ""))
+end
+local opened, why = reopenWith(json.encode({ style = "Capsule", clip = "Run", clipData = { name = "Run" } }))
+check(opened and widgets.style.value == "Capsule" and widgets.dirtyInfo.value == "Clip unchanged",
+      "corrupt edited clip in settings -> library clip " .. tostring(why or ""))
+
+-- Drag every joint on a clip without leg.thigh or arm.shoulder: nothing raises (#4).
+do
+  local data = M.Util.readJson(app.fs.joinPath(root, "clips", "run.json"))
+  data.name = "No upper limbs"
+  data.channels["leg.thigh"], data.channels["arm.shoulder"] = nil, nil
+  local file = app.fs.joinPath(M.userClipsDir(), "no-upper-limbs.json")
+  M.Util.writeJson(file, data)
+  reopenWith(json.encode({ clip = "No upper limbs" }))
+  os.remove(file)
+  check(widgets.clip.value == "No upper limbs", "clip without thigh and shoulder channels loads")
+
+  local handles = M.Render.handles
+  local errors, dragged = {}, 0
+  local ids = {}
+  for _, h in ipairs(handles({ near = {}, far = {} })) do table.insert(ids, h.id) end
+  for _, id in ipairs(ids) do
+    click("revert") -- a fresh clip each time: dragging a knee or elbow would add the missing channel
+    -- Offer only this handle, find where the preview draws it, then press, drag and release there.
+    M.Render.handles = function(sk)
+      for _, h in ipairs(handles(sk)) do
+        if h.id == id then return { h } end
+      end
+      return {}
+    end
+    local spot
+    local g = fakeGC(widgets.preview.t.width, widgets.preview.t.height)
+    function g:fillRect(r) if r.width == 5 and not spot then spot = { x = r.x + 2, y = r.y + 2 } end end
+    widgets.preview.t.onpaint({ context = g })
+    if spot then
+      local r0 = repaints
+      local okDrag, e = pcall(function()
+        widgets.preview.t.onmousedown({ x = spot.x, y = spot.y, button = MouseButton.LEFT })
+        widgets.preview.t.onmousemove({ x = spot.x + 5, y = spot.y + 4 })
+        widgets.preview.t.onmouseup({ x = spot.x + 5, y = spot.y + 4 })
+      end)
+      if not okDrag then table.insert(errors, id .. ": " .. tostring(e)) end
+      if repaints > r0 then dragged = dragged + 1 end
+    else
+      table.insert(errors, id .. ": handle not drawn")
+    end
+  end
+  M.Render.handles = handles
+  check(#errors == 0, "dragging any joint on a clip missing channels does not raise " .. table.concat(errors, "; "))
+  check(dragged == #ids, string.format("every joint drags (%d of %d)", dragged, #ids))
+end
 
 click("remove")
 check(M.Ghost.findLayer(spr, M.Ghost.ALL) == nil, "remove ghost")

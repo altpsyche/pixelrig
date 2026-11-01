@@ -72,7 +72,8 @@ return function(Clip, Rig, Render, Colors, Util)
     local text = layer and layer.properties(PROPS).settings
     if not text then return nil end
     local ok, data = pcall(Util.decode, text)
-    if not ok then return nil end
+    -- Anything but a JSON object (a number, a string, a list, null) is ignored: defaults instead.
+    if not ok or type(data) ~= "table" or data[1] ~= nil then return nil end
     -- v0.1 stored two flat colors; map them onto scheme slots.
     if data.color and not data.schemeColors then
       data.schemeColors = {

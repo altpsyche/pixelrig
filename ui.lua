@@ -18,6 +18,17 @@ return function(M)
     return names
   end
 
+  -- One line naming the first clip file left out of the library and why; nil if none was.
+  local function skippedText(lib)
+    local first = lib.skipped[1]
+    if not first then return nil end
+    -- Capped so a long file or channel name cannot widen the dialog.
+    local text = first.file .. ": " .. first.reason
+    if #text > 48 then text = text:sub(1, 45) .. "..." end
+    if #lib.skipped > 1 then text = text .. string.format(" (+%d more)", #lib.skipped - 1) end
+    return text
+  end
+
   local function nearAngle(v, old)
     if not old then return v end
     while v - old > 180 do v = v - 360 end
@@ -34,7 +45,8 @@ return function(M)
 
     local lib = M.loadLibrary()
     if #lib.names == 0 then
-      app.alert("No clips found.")
+      local why = skippedText(lib)
+      app.alert(why and ("No usable clips. " .. why) or "No clips found.")
       return
     end
 
@@ -78,10 +90,14 @@ return function(M)
       s.scope = scope
       if not lib.clips[s.clip] then s.clip = lib.names[1] end
       S = s
-      if S.clipData then
-        work = Clip.fromData(Util.deepCopy(S.clipData), "layer")
+      -- An edited clip kept with the ghost that no longer loads is dropped for the library clip.
+      local ok, edited = false, nil
+      if S.clipData then ok, edited = pcall(Clip.fromData, Util.deepCopy(S.clipData), "layer") end
+      if ok and lib.rigs[edited.rig] then
+        work = edited
         dirty = true
       else
+        S.clipData = nil
         work = Clip.clone(lib.clips[S.clip])
         dirty = false
       end
@@ -226,6 +242,7 @@ return function(M)
     end
 
     -- Pose editing -----------------------------------------------------------
+    -- A channel the clip lacks reads as 0, as Rig.solve draws it.
     local function editJoint(dr, x, y)
       local fr = build.frames[dr.frame]
       local sk, pose, rig = fr.sk, fr.pose, build.rig
@@ -236,14 +253,14 @@ return function(M)
       if id:find("knee$") then
         ch, val = "leg.thigh", Rig.angleFromDown(x - sk.hip.x, y - sk.hip.y)
       elseif id:find("ankle$") then
-        ch, val = "leg.knee", ps["leg.thigh"] - Rig.angleFromDown(x - s.knee.x, y - s.knee.y)
+        ch, val = "leg.knee", (ps["leg.thigh"] or 0) - Rig.angleFromDown(x - s.knee.x, y - s.knee.y)
       elseif id:find("toe$") then
         ch = "leg.foot"
         val = math.deg(math.atan(y - s.ankle.y, x - s.ankle.x)) - math.deg(math.atan(rig.bones.ankleH, rig.bones.foot))
       elseif id:find("elbow$") then
         ch, val = "arm.shoulder", Rig.angleFromDown(x - sk.shoulder.x, y - sk.shoulder.y)
       elseif id:find("hand$") then
-        ch, val = "arm.elbow", Rig.angleFromDown(x - s.elbow.x, y - s.elbow.y) - ps["arm.shoulder"]
+        ch, val = "arm.elbow", Rig.angleFromDown(x - s.elbow.x, y - s.elbow.y) - (ps["arm.shoulder"] or 0)
       elseif id == "neck" then
         ch, val = "torso.lean", Rig.angleFromUp(x - sk.hip.x, y - sk.hip.y)
       elseif id == "head" then
@@ -340,6 +357,12 @@ return function(M)
     end
 
     -- Widget sync ------------------------------------------------------------
+    local function refreshSkipped()
+      local text = skippedText(lib)
+      dlg:modify { id = "skipped", text = text or "" }
+      sec:setVisible("skipped", text ~= nil)
+    end
+
     local function refreshParams()
       local values = S.params[work.name] or {}
       for i = 1, MAXP do
@@ -464,6 +487,7 @@ return function(M)
       Util.writeJson(app.fs.joinPath(dir, name:gsub("[^%w%-_ ]", "_") .. ".json"), data)
       local oldName = work.name
       lib = M.loadLibrary()
+      refreshSkipped()
       work = Clip.clone(lib.clips[name])
       S.params[name] = Util.deepCopy(S.params[oldName] or {})
       S.clip, S.clipData, dirty = name, nil, false
@@ -533,6 +557,7 @@ return function(M)
 
     sec:begin("secMotion")
     W:combobox { id = "clip", label = "Clip", option = work.name, options = lib.names, onchange = onClipChange }
+    W:label { id = "skipped", label = "Skipped", text = "", visible = false }
     W:combobox { id = "scope", label = "Range", option = S.scope, options = Ghost.scopes(sprite), onchange = onScopeChange }
     W:slider { id = "frames", label = "Frames", min = 2, max = 48, value = S.frames, onchange = changed }
     W:slider { id = "fps", label = "FPS", min = 1, max = 60, value = S.fps, onchange = changed }
@@ -609,6 +634,7 @@ return function(M)
 
     refreshParams()
     refreshColors()
+    refreshSkipped()
     pull()
     rebuild()
     dlg:show { wait = false }
