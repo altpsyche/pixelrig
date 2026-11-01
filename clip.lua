@@ -103,11 +103,21 @@ end
 local DEVICES = { con = true, prn = true, aux = true, nul = true }
 for i = 0, 9 do DEVICES["com" .. i], DEVICES["lpt" .. i] = true, true end
 
+local MAXSTEM = 200 -- bytes: with " (n)", ".json" and a ".tmp" or ".bak", under 255
+
 -- Readable file name a clip is saved under: the name with control characters, spaces and
 -- characters a path cannot hold replaced by '_' ("Run test" -> "Run_test.json"); n > 1 adds
--- " (n)". The clip's real name lives in the file; M.clipSavePath picks n so files never collide.
+-- " (n)", and a long name is cut to 200 bytes. The clip's real name lives in the file;
+-- M.clipSavePath picks n so files never collide.
 function Clip.fileName(name, n)
-  local stem = name:gsub('[%c/\\:*?"<>| ]', "_"):gsub("^%.", "_"):gsub("%.$", "_")
+  local stem = name:gsub('[%c/\\:*?"<>| ]', "_")
+  -- Cut a long name to fit, never inside a UTF-8 character (bytes 0x80-0xBF continue one).
+  if #stem > MAXSTEM then
+    local cut = MAXSTEM
+    while cut > 0 and (stem:byte(cut + 1) or 0) >= 0x80 and stem:byte(cut + 1) < 0xC0 do cut = cut - 1 end
+    stem = stem:sub(1, cut)
+  end
+  stem = stem:gsub("^%.", "_"):gsub("%.$", "_")
   -- Windows refuses device names such as "con.json" or "nul.x.json".
   if DEVICES[stem:match("^[^.]*"):lower()] then stem = "_" .. stem end
   if n and n > 1 then stem = stem .. " (" .. n .. ")" end

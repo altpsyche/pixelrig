@@ -257,6 +257,22 @@ do
   check(loneListed, "library: a backup left without its clip file is listed as skipped")
   os.remove(app.fs.joinPath(dir, "Lone.json.bak"))
 
+  -- Long names save: the file name is cut to fit, on a character boundary.
+  local longAscii, longCjk = string.rep("a", 300), string.rep("日", 120)
+  for _, name in ipairs({ longAscii, longCjk }) do
+    local file = Clip.fileName(name, 99)
+    check(#file <= 240 and utf8.len(file) ~= nil,
+          "file name: a long name is cut to fit, whole characters (" .. #file .. " bytes)")
+    local p = M.clipSavePath(M.loadLibrary(), name)
+    local long = Util.deepCopy(run)
+    long.name = name
+    local okLong, longWhy = Util.writeJson(p, long)
+    local loaded = M.loadLibrary().clips[name]
+    check(okLong and loaded ~= nil, "a long name saves and loads (" .. tostring(longWhy) .. ")")
+  end
+  local p2 = M.clipSavePath(M.loadLibrary(), longAscii .. "b")
+  check(app.fs.fileName(p2) ~= app.fs.fileName(M.loadLibrary().clips[longAscii].file),
+        "two long names sharing a cut get separate files (" .. #app.fs.fileName(p2) .. " bytes)")
   M.userClipsDir = userDir
 end
 
