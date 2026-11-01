@@ -2,7 +2,7 @@
 local root = app.params.root
 local out = app.params.out
 local M = dofile(root .. "/modules.lua")(root)
-local Clip, Rig, Ghost, Util, Render = M.Clip, M.Rig, M.Ghost, M.Util, M.Render
+local Clip, Rig, Ghost, Util, Render, Colors = M.Clip, M.Rig, M.Ghost, M.Util, M.Render, M.Colors
 
 local failures = 0
 local function check(cond, msg)
@@ -350,24 +350,17 @@ do
   other:close()
 end
 
-do
-  local spr = Sprite(48, 48, ColorMode.INDEXED)
-  local s = settings { height = 40, groundY = 46, cx = 24 }
-  check(Ghost.apply(spr, s, lib.clips.Run, rig) == nil, "apply on indexed sprite")
-  spr:close()
-end
-
 -- The ghost is visible on indexed and grayscale sprites (#5): every pixel the RGB render draws is
 -- drawn, never in the transparent index, and the artist's palette is left as it was.
 do
-  local s = settings { height = 40, groundY = 46, cx = 24, frames = 4, colorScheme = "Near / Far" }
-  local build = Ghost.build(s, lib.clips.Run, rig)
-  local rgb = Image(48, 48, ColorMode.RGB)
-  rgb:clear()
-  Ghost.renderFrame(rgb, build, 1, s, Ghost.pixelConverter(ColorMode.RGB))
-  local want = 0
-  for it in rgb:pixels() do
-    if app.pixelColor.rgbaA(it()) > 0 then want = want + 1 end
+  local function count(img, visible)
+    local n = 0
+    if img then
+      for it in img:pixels() do
+        if visible(it()) then n = n + 1 end
+      end
+    end
+    return n
   end
 
   local function ghostImage(spr)
@@ -376,33 +369,49 @@ do
     return cel and cel.image
   end
 
-  local spr = Sprite(48, 48, ColorMode.INDEXED)
-  local pal = spr.palettes[1]
-  check(spr.transparentColor == 0, "indexed sprite: transparent index is 0")
-  -- Entry 0 is the ghost's near color and entry 1 its far color: each one's nearest match.
-  pal:setColor(0, Color { r = 0, g = 170, b = 255, a = 255 })
-  pal:setColor(1, Color { r = 235, g = 60, b = 60, a = 255 })
-  local size, before = #pal, {}
-  for i = 0, size - 1 do before[i] = pal:getColor(i).rgbaPixel end
-  check(Ghost.apply(spr, s, lib.clips.Run, rig) == nil,
-        "apply on indexed sprite whose transparent entry is the ghost color")
-  local img, drawn = ghostImage(spr), 0
-  if img then
-    for it in img:pixels() do
-      if it() ~= spr.transparentColor then drawn = drawn + 1 end
+  -- Pixels the ghost draws in RGB, and its color for (part, side), for scheme settings s.
+  local function reference(s)
+    local rgb = Image(48, 48, ColorMode.RGB)
+    rgb:clear()
+    Ghost.renderFrame(rgb, Ghost.build(s, lib.clips.Run, rig), 1, s, Ghost.pixelConverter(ColorMode.RGB))
+    local colorOf = Colors.resolver(s.colorScheme, Colors.resolve(s.colorScheme))
+    return count(rgb, function(v) return app.pixelColor.rgbaA(v) > 0 end), colorOf
+  end
+
+  local function setRgb(pal, i, c) pal:setColor(i, Color { r = c[1], g = c[2], b = c[3], a = 255 }) end
+
+  -- The palette entry at the transparent index is exactly one of the ghost's colors: the near
+  -- color with Near / Far, the auto-darkened far color with Mono, at index 0 and at index 2.
+  for _, case in ipairs({
+    { scheme = "Near / Far", transparent = 0, side = "near" },
+    { scheme = "Mono", transparent = 2, side = "far" },
+  }) do
+    local s = settings { height = 40, groundY = 46, cx = 24, frames = 4, colorScheme = case.scheme }
+    local want, colorOf = reference(s)
+    local spr = Sprite(48, 48, ColorMode.INDEXED)
+    spr.transparentColor = case.transparent
+    local pal = spr.palettes[1]
+    setRgb(pal, case.transparent, colorOf("torso", case.side))
+    local size, before = #pal, {}
+    for i = 0, size - 1 do before[i] = pal:getColor(i).rgbaPixel end
+    local label = "indexed, " .. case.scheme .. ", transparent index " .. case.transparent
+    check(Ghost.apply(spr, s, lib.clips.Run, rig) == nil, label .. ": apply")
+    local drawn = count(ghostImage(spr), function(v) return v ~= case.transparent end)
+    check(want > 0 and drawn == want,
+          label .. ": every ghost pixel is visible, none in the transparent index (" .. drawn .. " of " .. want .. ")")
+    local same = #spr.palettes[1] == size
+    for i = 0, size - 1 do
+      if spr.palettes[1]:getColor(i).rgbaPixel ~= before[i] then same = false end
     end
+    check(same, label .. ": apply leaves the sprite palette unchanged")
+    spr:close()
   end
-  check(want > 0 and drawn == want,
-        "indexed: every ghost pixel is visible, none in the transparent index (" .. drawn .. " of " .. want .. ")")
-  local same = #spr.palettes[1] == size
-  for i = 0, size - 1 do
-    if spr.palettes[1]:getColor(i).rgbaPixel ~= before[i] then same = false end
-  end
-  check(same, "indexed: apply leaves the sprite palette unchanged")
-  spr:close()
+
+  local s = settings { height = 40, groundY = 46, cx = 24, frames = 4 }
+  local want = reference(s)
 
   -- A palette holding only the transparent entry has nothing visible to draw with: no error.
-  spr = Sprite(48, 48, ColorMode.INDEXED)
+  local spr = Sprite(48, 48, ColorMode.INDEXED)
   spr.palettes[1]:resize(1)
   check(Ghost.apply(spr, s, lib.clips.Run, rig) == nil and #spr.palettes[1] == 1,
         "indexed: a palette with only the transparent entry applies without error, palette unchanged")
@@ -410,12 +419,7 @@ do
 
   spr = Sprite(48, 48, ColorMode.GRAY)
   check(Ghost.apply(spr, s, lib.clips.Run, rig) == nil, "apply on grayscale sprite")
-  img, drawn = ghostImage(spr), 0
-  if img then
-    for it in img:pixels() do
-      if app.pixelColor.grayaA(it()) > 0 then drawn = drawn + 1 end
-    end
-  end
+  local drawn = count(ghostImage(spr), function(v) return app.pixelColor.grayaA(v) > 0 end)
   check(want > 0 and drawn == want, "grayscale: every ghost pixel is visible (" .. drawn .. " of " .. want .. ")")
   spr:close()
 end
