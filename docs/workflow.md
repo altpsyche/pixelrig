@@ -295,6 +295,8 @@ Applied in full on every review. Each line is a hard rule, not a judgement call.
   where the owner put it.
 - PixelRig writes only to layers, cels and tags it owns and marks `pixelrig-ghost`; nothing the
   artist drew or named is changed.
+- PixelRig adds frames or changes frame durations only behind an option the artist turns on,
+  off by default (ADR-0005).
 - Every change to a sprite is one `app.transaction`, so it undoes in one step; preview code never
   changes a sprite.
 - The extension is plain Lua: no native helper, no network access, no Aseprite build or fork given

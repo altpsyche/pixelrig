@@ -8,10 +8,12 @@ pixel artists animate faster; the artist draws every final pixel. Characters 32�
 view first, humanoid first.
 
 **Constitution.** PixelRig never edits the artist's pixels: it writes only to layers and tags it
-owns and marks (`pixelrig-ghost`). Every change to a sprite is one undo step, and a preview never
-changes the sprite. It ships as a plain Lua extension: no native helper, no network, no Aseprite
-build or fork given to users (Aseprite EULA). It never generates final art with AI. A new motion is
-data (a clip file), not code. Mirror these in `docs/workflow.md` § The constitution.
+owns and marks (`pixelrig-ghost`). It adds frames or changes frame durations only when the artist
+has turned on that option, off by default ([ADR-0005](docs/adr/0005-timeline-changes-opt-in.md)).
+Every change to a sprite is one undo step, and a preview never changes the sprite. It ships as a
+plain Lua extension: no native helper, no network, no Aseprite build or fork given to users
+(Aseprite EULA). It never generates final art with AI. A new motion is data (a clip file), not
+code. Mirror these in `docs/workflow.md` § The constitution.
 
 > **Stay under 200 lines** — this loads into every session. Detail belongs in a co-located `.md`.
 > **Session start:** the owner says a trigger word, as listed in `/work`'s `description`, with no
@@ -117,8 +119,9 @@ Read the full ADR when it governs your work; the file is the authority, this is 
   runs: real sandboxes, guard-safe commands, outcome criteria;
   [template/0004](docs/adr/template/0004-template-adrs-in-own-folder-specs-dropped.md) template
   ADRs in their own folder, specs dropped
-- **PixelRig's own:** none yet. The template has not finished moving 0001–0003 into
-  `docs/adr/template/`; until it does, PixelRig's first ADR is 0005, so no number collides.
+- **PixelRig's own:** [0005](docs/adr/0005-timeline-changes-opt-in.md) the ghost changes the
+  artist's timeline (frames, durations) only on an explicit opt-in. Numbering starts at 0005: the
+  template has not finished moving 0001–0003 into `docs/adr/template/`, so no number collides.
 - **Pending:** the open questions in [`docs/idea.md`](docs/idea.md) § Open Questions stay there until
   one is decided. A decided question gets a number here and a file in `docs/adr/`.
 
