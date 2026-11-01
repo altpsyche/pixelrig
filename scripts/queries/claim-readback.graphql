@@ -1,0 +1,17 @@
+# **Read back a claim** in docs/agents/issue-tracker.md: an issue's or a PR's labels and its newest
+# comments, with the logged-in account for **Whose comments count**.
+query($owner: String!, $repo: String!, $n: Int!) {
+  viewer { login }
+  repository(owner: $owner, name: $repo) {
+    issueOrPullRequest(number: $n) {
+      ... on Issue {
+        labels(first: 20) { nodes { name } }
+        comments(last: 100) { nodes { body author { login } } }
+      }
+      ... on PullRequest {
+        labels(first: 20) { nodes { name } }
+        comments(last: 100) { nodes { body author { login } } }
+      }
+    }
+  }
+}
