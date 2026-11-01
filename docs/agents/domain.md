@@ -7,11 +7,8 @@ How the engineering skills consume this project's domain documentation. This rep
 
 - **[`AGENTS.md`](../../AGENTS.md)** — conventions, anti-patterns, the ADR index, and the precedence
   order to apply when sources disagree.
-- **[`docs/idea.md`](../idea.md) § Core Concepts** — the authoritative vocabulary until
-  `GLOSSARY.md` exists.
-- **`GLOSSARY.md`** at the repo root, *if it exists*. It is created lazily by `/domain-modeling` the
-  first time a term is resolved. If it does not exist, **proceed silently**: do not flag its absence
-  and do not create it upfront.
+- **[`GLOSSARY.md`](../../GLOSSARY.md)** at the repo root — the authoritative vocabulary, kept by
+  `/domain-modeling`. `docs/idea.md` § Core Concepts points to it.
 - **[`docs/adr/`](../adr/)** — read the ADRs that touch the area you are about to work in.
 - **The co-located `.md`** beside the work you touch, which describes how that part works.
 - **[`docs/specs/`](../specs/)** — what was agreed to be built, and its testing seams.
@@ -19,7 +16,7 @@ How the engineering skills consume this project's domain documentation. This rep
 ## Use the glossary's vocabulary
 
 When your output names a domain concept (an issue title, a test name, a type name), use the term as
-`docs/idea.md` § Core Concepts and the work define it. Do not drift to synonyms. If a synonym is
+`GLOSSARY.md` and the work define it. Do not drift to synonyms. If a synonym is
 genuinely better, `/domain-modeling` changes the model and the vocabulary together, in one commit.
 
 Distinctions agents most often blur:
@@ -28,8 +25,14 @@ Distinctions agents most often blur:
   the artist's. Never "animation" for a clip.
 - **Pose** vs **skeleton** — a pose is channel values; a skeleton is the pose solved to joint
   positions.
-- **Key pose (mark)** vs **key** — a key pose is a named moment of the whole clip that owns
+- **Key pose** vs **key** — a key pose is a named moment of the whole clip that owns
   spacing; a key is one channel's value at one time.
+- **Key pose** vs **drawing role** — a key pose belongs to a clip (motion data); a drawing role
+  (key, breakdown, inbetween) belongs to one of the artist's drawings. Neither is a "mark" in prose.
+- **Drawing** vs **cel** — a drawing is one frame of the artist's animation; a cel is one layer's
+  image in that frame.
+- **Exposure** vs **duration** — an exposure is a whole number of base frames; a duration is the
+  frame's milliseconds in Aseprite. The exposure sheet derives one from the other.
 - **Ghost** vs **ghost layer** — the ghost is the rendered figure; the ghost layer is the
   reference layer that holds it.
 - **Range** vs **tag** — a range is where a ghost lives: all frames or one tag. PixelRig's own

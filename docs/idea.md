@@ -24,28 +24,9 @@ guides inside the editor they already use. The artist draws every final pixel. I
 
 ## 3. Core Concepts
 
-- **Clip** — one motion as data (`clips/*.json`): channels, key poses, params. Built-in or user
-  (saved under the Aseprite config folder). Not a sprite animation; it has no pixels.
-- **Channel** — one animated value of a clip, such as `leg.thigh`, keyed over cycle time
-  `t ∈ [0, 1)`.
-- **Sided channel** — a channel authored for the near limb; the far limb samples the same curve
-  `sideOffset` later. Editing one side edits both.
-- **Key pose (mark)** — a named moment in a clip (`contact`, `pass`); becomes a one-frame tag and
-  owns the spacing (ease) until the next key pose.
-- **Param** — a clip-declared slider that scales or offsets channels (stride, bounce).
-- **Rig** — skeleton proportions (`rigs/*.json`), normalized to standing height 1.0.
-- **Preset / proportions** — multipliers on a rig (head, torso, arms, legs, bulk).
-- **Pose** — a clip sampled at one time: channel values. **Skeleton** — a pose solved to joint
-  positions by forward kinematics, grounded.
-- **Ghost** — the rendered guide figure. **Ghost layer** — the reference layer holding it, marked
-  `pixelrig-ghost`, never exported.
-- **Range (scope)** — where a ghost lives: all frames, or one tag. One ghost layer per range.
-- **Build** — every frame of a cycle solved and placed for given settings. **Apply** — writing a
-  build into the sprite as one undo step. **Preview** — rendering a build in the dialog only.
-- **Travel** — root motion that locks planted feet. **Footprint** — a planted foot's mark on the
-  ground line.
-- **Style** (Stick, Capsule, Joints + arcs) and **color scheme** (Mono, Near / Far, Limbs,
-  Segments), each scheme with its own color slots.
+The project's vocabulary lives in [`GLOSSARY.md`](../GLOSSARY.md): motion (clip, channel, key pose,
+rig, pose), the ghost (ghost layer, range, build, apply, preview, travel), and timing (drawing,
+base rate, exposure, drawing role, exposure sheet).
 
 ## 4. Scope
 
