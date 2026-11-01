@@ -5,7 +5,10 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  workflow_call: # .github/workflows/release.yml runs these checks on a tag before it publishes
 
+# Called from release.yml, github.workflow is "Release", so this group is the caller's own name and
+# tag; release.yml must not set a concurrency group of that shape or the run waits on itself.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
