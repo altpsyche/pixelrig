@@ -13,7 +13,8 @@ guides inside the editor they already use. The artist draws every final pixel. I
 - **Guides first.** PixelRig generates reference and data; it never paints final art. Pixel ops
   (cutout rigs, rotation, retarget bakes) wait until an experiment shows artist cleanup costs less
   than redrawing.
-- **The artist's pixels are untouchable.** PixelRig writes only to layers and tags it owns.
+- **The artist's pixels are untouchable.** PixelRig writes only to layers and tags it owns, and
+  changes the timeline (frames, durations) only when the artist opts in.
 - **One undo step per change; previews never touch the sprite.**
 - **Plain extension.** Lua only, no native helper, no network, no forked Aseprite given to users.
 - **Motions are data.** A new motion is a clip file. If a motion needs code, the clip format has a
@@ -71,7 +72,7 @@ dialog through a mock `Dialog`.
 
 - Run cycle ghost with preview, pose editing, travel, proportions, color schemes (shipped as
   `v0.0.1-alpha`)
-- Confirm the dialog in the real Aseprite UI
+- Confirm the dialog in the real Aseprite UI (done: owner-checked, #16)
 
 ### Phase 2 — Motion library
 
@@ -103,6 +104,5 @@ dialog through a mock `Dialog`.
 
 - Oldest Aseprite version supported. Tested only on a source build (Lua API 41).
 - Clip format for one-shot motions: one `loop: false` flag, or a separate clip kind?
-- Whether the repo goes public, and when (MIT and open source are decided; visibility is not).
 - Data model for 4/8 directions: one rig with per-direction projection, or one rig per direction?
 - Gate for pixel ops: what cleanup-time result unlocks cutout rig and retarget bakes?
