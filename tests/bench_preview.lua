@@ -7,7 +7,8 @@
 -- painting the preview after each move as Aseprite does. Each line names the color mode, the
 -- seconds, and how many ghost frames were rendered and art composites made. A checksum of the
 -- composite's pixels lets two runs, before and after a change, show the preview art is identical.
--- Timings are os.clock() CPU seconds; not a test, nothing fails. tools/test.sh does not run it.
+-- Timings are os.clock() CPU seconds; not a test, nothing fails. tools/test.sh does not run it,
+-- so it carries its own small mock rather than loading tests/ui_mock.lua, which runs its checks.
 local root = app.params.root
 local MOVES = tonumber(app.params.moves or "") or 10
 local SIZE = 1024

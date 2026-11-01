@@ -464,8 +464,9 @@ return function(Clip, Rig, Render, Colors, Util)
   -- RGB composite of visible art (no ghosts, no reference layers) at a frame, drawn by Aseprite's
   -- own renderer in C++, for every color mode: a per-pixel Lua loop took about a second per frame
   -- on a 1024x1024 indexed sprite (#8). The renderer skips hidden and reference layers, and a
-  -- ghost layer is always a reference layer (ensureLayer), so the art is what it was. It honors
-  -- layer and cel opacity and blend modes on every color mode, as the canvas does.
+  -- ghost layer is always a reference layer (ensureLayer; Lua cannot unset the flag), so the art
+  -- is what it was. Layer and cel opacity and blend modes now apply on indexed and gray sprites
+  -- too; the loop drew their pixels opaque over the layers below.
   function Ghost.composite(sprite, frameNumber)
     local img = Image(sprite.width, sprite.height, ColorMode.RGB)
     img:clear()
