@@ -509,5 +509,49 @@ do
   spr:close()
 end
 
+-- Ghost layers are found wherever they are (#6). Every ghost layer in the sprite, groups included.
+local function ghostLayers(spr)
+  local found = {}
+  local function walk(layers)
+    for _, l in ipairs(layers) do
+      if l.isGroup then walk(l.layers) elseif Ghost.isGhost(l) then table.insert(found, l) end
+    end
+  end
+  walk(spr.layers)
+  return found
+end
+
+-- A ghost layer the artist moved into a group: Apply finds it, so no duplicate, and Remove
+-- deletes it, keeping the artist's layer and frame (#3) and adding no frame (ADR-0005).
+do
+  local spr = Sprite(64, 64, ColorMode.RGB)
+  local art = spr.layers[1]
+  local s = settings { frames = 4, height = 40, groundY = 60, cx = 32 }
+  check(Ghost.apply(spr, s, lib.clips.Run, rig) == nil, "grouped: first apply")
+  local ghost = Ghost.findLayer(spr, Ghost.ALL)
+  local group = spr:newGroup()
+  group.name = "Refs"
+  ghost.parent = group
+  check(ghost.parent == group, "grouped: ghost layer moved into a group")
+  check(Ghost.findLayer(spr, Ghost.ALL) == ghost, "grouped: findLayer finds the ghost inside the group")
+  check(Ghost.apply(spr, s, lib.clips.Run, rig) == nil, "grouped: re-apply")
+  local n = #ghostLayers(spr)
+  check(n == 1 and ghost.parent == group, "grouped: re-apply makes no duplicate (" .. n .. " ghost layers)")
+  -- A duplicate the old lookup left behind, at the top level: Remove clears both.
+  local dup = spr:newLayer()
+  dup.data = Ghost.MARK
+  dup.properties("pixelrig").scope = Ghost.ALL
+  app.sprite = spr; app.layer = art; app.frame = 1
+  Ghost.remove(spr, Ghost.ALL)
+  n = #ghostLayers(spr)
+  check(n == 0 and Ghost.findLayer(spr, Ghost.ALL) == nil, "grouped: remove deletes every ghost of the scope (" .. n .. " left)")
+  check(#group.layers == 0 and #spr.frames == 1 and app.layer == art and app.frame.frameNumber == 1,
+        "grouped: remove leaves the group, the frames and the artist's layer and frame")
+  local tags = 0
+  for _, t in ipairs(spr.tags) do if (t.data or ""):find(Ghost.MARK, 1, true) then tags = tags + 1 end end
+  check(tags == 0, "grouped: remove clears the ghost's tags (" .. tags .. " left)")
+  spr:close()
+end
+
 print(failures == 0 and "ALL PASSED" or (failures .. " FAILED"))
 if failures > 0 then error(failures .. " test(s) failed") end

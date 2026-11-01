@@ -65,19 +65,39 @@ return function(Clip, Rig, Render, Colors, Util)
     return math.min(N, len + add), N, add
   end
 
+  -- A ghost layer is an image layer carrying the mark; its range is in PixelRig's own properties.
   function Ghost.isGhost(layer)
-    return layer and layer.data == Ghost.MARK
+    return layer ~= nil and not layer.isGroup and layer.data == Ghost.MARK
   end
 
   function Ghost.layerScope(layer)
     return layer.properties(PROPS).scope or Ghost.ALL
   end
 
-  function Ghost.findLayer(sprite, scope)
-    for _, layer in ipairs(sprite.layers) do
-      if Ghost.isGhost(layer) and Ghost.layerScope(layer) == scope then return layer end
+  -- Every ghost layer in the sprite, inside groups too (#6), top-level order first.
+  function Ghost.layers(sprite)
+    local found = {}
+    local function walk(layers)
+      for _, layer in ipairs(layers) do
+        if layer.isGroup then walk(layer.layers)
+        elseif Ghost.isGhost(layer) then table.insert(found, layer) end
+      end
     end
-    return nil
+    walk(sprite.layers)
+    return found
+  end
+
+  -- Every ghost layer of scope; more than one only where an older version made a duplicate.
+  local function scopeLayers(sprite, scope)
+    local found = {}
+    for _, layer in ipairs(Ghost.layers(sprite)) do
+      if Ghost.layerScope(layer) == scope then table.insert(found, layer) end
+    end
+    return found
+  end
+
+  function Ghost.findLayer(sprite, scope)
+    return scopeLayers(sprite, scope)[1]
   end
 
   function Ghost.loadSettings(layer)
@@ -302,10 +322,12 @@ return function(Clip, Rig, Render, Colors, Util)
     tag.color = Color { r = rgb[1], g = rgb[2], b = rgb[3] }
   end
 
-  -- The active layer and frame number, with `removed` (a layer about to be deleted) left out.
+  -- The active layer and frame number, with `removed` (layers about to be deleted) left out.
   local function site(removed)
     local layer, frame = app.layer, app.frame
-    if removed and layer == removed then layer = nil end
+    for _, gone in ipairs(removed or {}) do
+      if layer == gone then layer = nil end
+    end
     return layer, frame and frame.frameNumber
   end
 
@@ -317,7 +339,7 @@ return function(Clip, Rig, Render, Colors, Util)
   -- Runs fn as one undo step on sprite, made active for it since NewLayer and app.transaction act
   -- on the active sprite, then puts the artist back where they were (#3): adding frames moves the
   -- active frame. Both the active sprite's layer and frame and, when another sprite was active,
-  -- sprite's own layer and frame are restored. `removed`, a layer fn deletes, is not restored.
+  -- sprite's own layer and frame are restored. `removed`, the layers fn deletes, are not restored.
   local function transactionOn(sprite, label, fn, removed)
     local prevSprite = app.sprite
     local prevLayer, prevFrame = site(removed)
@@ -406,12 +428,13 @@ return function(Clip, Rig, Render, Colors, Util)
     return nil
   end
 
+  -- Deletes every ghost layer of scope, wherever it sits (#6), and its tags, as one undo step.
   function Ghost.remove(sprite, scope)
-    local layer = Ghost.findLayer(sprite, scope)
+    local layers = scopeLayers(sprite, scope)
     transactionOn(sprite, "Remove Ghost Reference", function()
-      if layer then sprite:deleteLayer(layer) end
+      for _, layer in ipairs(layers) do sprite:deleteLayer(layer) end
       clearTags(sprite, scope)
-    end, layer)
+    end, layers)
     app.refresh()
   end
 
