@@ -29,6 +29,9 @@ return function(M)
     return text
   end
 
+  -- Seconds between preview frames at fps.
+  local function playInterval(fps) return 1 / max(1, fps) end
+
   local function nearAngle(v, old)
     if not old then return v end
     while v - old > 180 do v = v - 360 end
@@ -281,7 +284,7 @@ return function(M)
     local function onFps()
       if playing then
         playTimer:stop()
-        playTimer.interval = 1 / max(1, dlg.data.fps)
+        playTimer.interval = playInterval(dlg.data.fps)
         playTimer:start()
       end
       changed()
@@ -568,7 +571,7 @@ return function(M)
       end
     end }
     applyTimer = Timer { interval = 0.4, ontick = function() applyTimer:stop(); applyNow() end }
-    playTimer = Timer { interval = 1 / max(1, S.fps), ontick = function()
+    playTimer = Timer { interval = playInterval(S.fps), ontick = function()
       if not build then return end
       setFrame(cur % build.N + 1)
     end }
@@ -587,7 +590,7 @@ return function(M)
       playing = not playing
       dlg:modify { id = "play", text = playing and "Pause" or "Play" }
       if playing then
-        playTimer.interval = 1 / max(1, dlg.data.fps)
+        playTimer.interval = playInterval(dlg.data.fps)
         playTimer:start()
       else
         playTimer:stop()
