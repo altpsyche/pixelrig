@@ -514,11 +514,20 @@ return function(M)
         app.alert("'" .. name .. "' is a built-in clip. Pick another name.")
         return
       end
+      -- Never overwrite silently (#7): saving over one of the artist's clips asks first.
+      local path, replacing = M.clipSavePath(lib, name)
+      if replacing then
+        local r = app.alert { title = "PixelRig", text = "Replace " .. replacing .. "?",
+                              buttons = { "Replace", "Cancel" } }
+        if r ~= 1 then return end
+      end
       local data = Clip.export(work)
       data.name = name
-      local dir = M.userClipsDir()
-      app.fs.makeAllDirectories(dir)
-      Util.writeJson(app.fs.joinPath(dir, name:gsub("[^%w%-_ ]", "_") .. ".json"), data)
+      local ok, why = Util.writeJson(path, data)
+      if not ok then
+        app.alert("Could not save clip '" .. name .. "': " .. why)
+        return
+      end
       local oldName = work.name
       lib = M.loadLibrary()
       refreshSkipped()
