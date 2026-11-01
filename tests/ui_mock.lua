@@ -144,6 +144,8 @@ local openedMotionOnly = widgets.clip.visible and not (widgets.param1.visible or
   or widgets.ease.visible)
 
 check(widgets.height.value == 40 and widgets.groundY.value == 59, "auto-fit on first open")
+check(widgets.fit.t.text == "Fit to art (selection, else all visible art)",
+      "fit button says what it measures: " .. tostring(widgets.fit.t.text))
 -- (in picker mode the sliders sit in the Clip section, checked below)
 check((NOTABS or (widgets.param1.visible == true and widgets.param6.visible == false))
       and widgets.param1.label == "Stride %" and widgets.param1.value == 100,

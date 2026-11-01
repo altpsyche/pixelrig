@@ -554,7 +554,7 @@ return function(M)
     W:combobox { id = "facing", label = "Facing", option = S.facing, options = { "Right", "Left" }, onchange = changed }
 
     sec:begin("secPlace")
-    W:button { id = "fit", text = "Fit to art (selection / layer)", onclick = onFit }
+    W:button { id = "fit", text = "Fit to art (selection, else all visible art)", onclick = onFit }
     W:slider { id = "height", label = "Height px", min = 8, max = max(16, sprite.height * 2), value = S.height, onchange = changed }
     W:slider { id = "groundY", label = "Ground Y", min = 0, max = sprite.height - 1, value = S.groundY, onchange = changed }
     W:slider { id = "cx", label = "Center X", min = 0, max = sprite.width, value = S.cx, onchange = changed }
