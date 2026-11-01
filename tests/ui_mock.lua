@@ -394,6 +394,7 @@ do
   click("close")
   for k in pairs(widgets) do widgets[k] = nil end
   local tiny = Sprite(32, 32, ColorMode.RGB)
+  local tinyArt = tiny.layers[1]
   local dot = Image(32, 32, ColorMode.RGB)
   for y = 25, 29 do for x = 14, 17 do dot:drawPixel(x, y, app.pixelColor.rgba(200, 80, 40, 255)) end end
   tiny.cels[1].image = dot
@@ -411,6 +412,16 @@ do
     local g = M.Ghost.findLayer(tiny, M.Ghost.ALL)
     check(applied2 and g and M.Ghost.loadSettings(g).height == 8,
           "after a clamped Fit, Apply writes an 8px ghost " .. tostring(why4 or ""))
+    -- The canvas grows while the dialog is open: Fit reaches the new rows, past the old ranges.
+    tiny.selection = Selection()
+    tiny.height = 64
+    local grown = Image(32, 64, ColorMode.RGB)
+    for y = 40, 59 do for x = 20, 25 do grown:drawPixel(x, y, app.pixelColor.rgba(200, 80, 40, 255)) end end
+    tiny:newCel(tinyArt, 1, grown, Point(0, 0))
+    local refit, why5 = pcall(click, "fit")
+    check(refit and widgets.height.value == 20 and widgets.groundY.value == 59 and widgets.groundY.max == 63,
+          "after the canvas grows, Fit sets Ground Y past the old range " .. tostring(why5 or "") ..
+          " (" .. widgets.height.value .. "px, ground " .. widgets.groundY.value .. " of " .. widgets.groundY.max .. ", sprite " .. tiny.height .. ")")
     click("close")
   end
   tiny:close()

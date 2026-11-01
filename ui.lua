@@ -413,11 +413,18 @@ return function(M)
       end
     end
 
+    -- Sets the Place sliders to v.height, v.groundY and v.cx, already clamped by Ghost, with their
+    -- ranges renewed first: the canvas may have changed size since the dialog opened (#44).
+    local function setPlace(v)
+      for id, r in pairs(Ghost.placeLimits(sprite)) do
+        dlg:modify { id = id, min = r.min, max = r.max, value = v[id] }
+      end
+    end
+
     local function pushAll()
       local p = S.proportions
       local values = {
         style = S.style, facing = S.facing, thickness = S.thickness, pixelPerfect = S.pixelPerfect,
-        height = S.height, groundY = S.groundY, cx = S.cx,
         frames = S.frames, fps = S.fps, timing = S.timing, fillAll = S.fillAll, labels = S.labels,
         addFrames = S.addFrames,
         colorScheme = S.colorScheme, opacity = S.opacity,
@@ -430,6 +437,7 @@ return function(M)
         else dlg:modify { id = id, value = v } end
       end
       dlg:modify { id = "preset", option = S.preset or "Custom" }
+      setPlace(S)
       refreshColors()
       dlg:modify { id = "clip", options = lib.names, option = work.name }
       dlg:modify { id = "clipName", text = work.name .. " custom" }
@@ -502,9 +510,7 @@ return function(M)
         app.alert("No art found: select an area or draw on a layer first.")
         return
       end
-      dlg:modify { id = "height", value = fit.height }
-      dlg:modify { id = "groundY", value = fit.groundY }
-      dlg:modify { id = "cx", value = fit.cx }
+      setPlace(fit)
       changed()
     end
 
