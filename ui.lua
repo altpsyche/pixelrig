@@ -262,8 +262,8 @@ return function(M)
       S.clipData = dirty and Clip.export(work) or nil
       local err = Ghost.apply(sprite, S, work, lib.rigs[work.rig])
       if err then app.alert(err) end
-      -- The art composites are kept: Apply writes only the ghost, a reference layer the composite
-      -- leaves out, and frames it adds come after every frame composited so far (#8).
+      -- Apply changed the sprite, so composite the art again, as on any sprite change (artChanged).
+      bgCache = {}
       refreshFit()
     end
 
@@ -585,8 +585,19 @@ return function(M)
       setFrame(cur % build.N + 1)
     end }
 
+    -- Art the artist edits while the dialog is open shows in the preview at once: any change to the
+    -- sprite (an edit, undo or redo) drops the art composites, and the painted frame is composited
+    -- again (#8). Pose edits do not change the sprite, so a joint drag keeps them.
+    local function artChanged()
+      bgCache = {}
+      if dlg then dlg:repaint() end
+    end
+    local okEvents, artListener = pcall(function() return sprite.events:on("change", artChanged) end)
+    if not okEvents then artListener = nil end
+
     dlg = Dialog { title = "PixelRig: Ghost Reference", onclose = function()
       playTimer:stop(); changeTimer:stop(); applyTimer:stop()
+      if artListener then pcall(function() sprite.events:off(artListener) end) end
     end }
 
     -- Without tabs (v1.3-rc6) every section is a separate page; a shorter preview keeps the

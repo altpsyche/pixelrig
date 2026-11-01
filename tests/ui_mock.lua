@@ -224,17 +224,41 @@ do
   check(edits == MOVES and renders == MOVES and composites == 0, string.format(
     "a %d-move joint drag renders one ghost frame per move and keeps the art (%d edits, %d frames, %d composites)",
     MOVES, edits, renders, composites))
-  -- Auto-apply on release writes only the ghost, a reference layer: the art composite is kept.
+  -- Art is composited again whenever it may have changed (#8 review): Apply on release, a
+  -- settings change, and the artist editing the sprite. The newest composite is kept to read.
+  local last
+  M.Ghost.composite = function(...)
+    composites = composites + 1
+    last = composite(...)
+    return last
+  end
+  local function paint() widgets.preview.t.onpaint({ context = fakeGC(280, 220) }) end
   setRaw("autoApply", true)
   composites = 0
   widgets.preview.t.onmousedown({ x = spot.x + 2 * MOVES, y = spot.y + MOVES, button = MouseButton.LEFT })
   widgets.preview.t.onmousemove({ x = spot.x, y = spot.y })
   widgets.preview.t.onmouseup({ x = spot.x, y = spot.y })
-  widgets.preview.t.onpaint({ context = fakeGC(280, 220) })
+  paint()
   setRaw("autoApply", false)
+  check(M.Ghost.findLayer(spr, M.Ghost.ALL) ~= nil and composites == 1,
+        "auto-apply after a drag composites the art once again (" .. composites .. " composites)")
+  composites = 0
+  set("opacity", 50)
+  paint()
+  check(composites == 1, "a settings change composites the art again (" .. composites .. " composites)")
+  composites = 0
+  local green = app.pixelColor.rgba(0, 255, 0, 255)
+  local artLayer
+  for _, l in ipairs(spr.layers) do if l.name == "Layer 1" then artLayer = l end end
+  -- A pixel inside the art, so the art's bounds, which Fit measures below, stay as they were.
+  local cel = artLayer:cel(1)
+  local was = cel.image:getPixel(30, 40)
+  app.transaction("art edit", function() cel.image:drawPixel(30, 40, green) end)
+  paint()
+  check(composites == 1 and last:getPixel(30, 40) == green,
+        "an art edit in the sprite shows in the preview (" .. composites .. " composites)")
+  app.transaction("art edit back", function() cel.image:drawPixel(30, 40, was) end)
   M.Ghost.renderFrame, M.Ghost.composite = renderFrame, composite
-  check(M.Ghost.findLayer(spr, M.Ghost.ALL) ~= nil and composites == 0,
-        "auto-apply after a drag keeps the art composite (" .. composites .. " composites)")
 end
 
 -- easing
@@ -365,6 +389,17 @@ click("apply")
 check(#spr.frames == 12 and M.Ghost.loadSettings(layer).addFrames == true,
       "apply with Add frames on adds frames to 12 and saves the option (" .. #spr.frames .. ")")
 check(widgets.addFrames.text == "Add frames", "the check reads plain Add frames once the cycle fits")
+-- A frame Apply added is composited when shown: before, it was past the sprite's end and had no art.
+do
+  local shown = {}
+  local composite = M.Ghost.composite
+  M.Ghost.composite = function(sprite, fr) table.insert(shown, fr); return composite(sprite, fr) end
+  set("frame", 5)
+  widgets.preview.t.onpaint({ context = fakeGC(280, 220) })
+  M.Ghost.composite = composite
+  check(#shown == 1 and shown[1] == 5, "a frame Apply added is composited when shown (" .. table.concat(shown, ",") .. ")")
+  set("frame", 1)
+end
 
 -- Another sprite active, its own layer and frame 3 (#3): Fit measures only the dialog's sprite,
 -- and Apply writes the dialog's sprite without leaving the artist on it.
