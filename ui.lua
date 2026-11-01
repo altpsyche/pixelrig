@@ -75,7 +75,7 @@ return function(M)
     local function defaultsFor(scope)
       local s = Util.deepCopy(Ghost.DEFAULTS)
       s.scope = scope
-      s.height = max(8, floor(sprite.height * 0.8))
+      s.height = floor(sprite.height * 0.8) -- loadScope clamps it to the Height slider (#44)
       s.groundY = sprite.height - 1
       s.cx = sprite.width // 2
       local fit = fitArt()

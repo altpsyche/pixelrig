@@ -378,15 +378,15 @@ end
 local opened, why = reopenWith(json.encode({ style = "Capsule", clip = "Run", clipData = { name = "Run" } }))
 check(opened and widgets.style.value == "Capsule" and widgets.dirtyInfo.value == "Clip unchanged",
       "corrupt edited clip in settings -> library clip " .. tostring(why or ""))
+check(widgets.addFrames.value == false, "a ghost saved without the option opens with Add frames off")
+opened, why = reopenWith(json.encode({ addFrames = "false" }))
+check(opened and widgets.addFrames.value == false, "a ghost saved with addFrames = \"false\" opens with Add frames off"
+      .. (why and (" (" .. tostring(why) .. ")") or ""))
 -- Saved Place values outside the sliders' ranges, as after the canvas shrank (#44): the dialog
 -- opens with each clamped to its slider.
 opened, why = reopenWith(json.encode({ height = 500, groundY = 999, cx = -5 }))
 check(opened and widgets.height.value == 128 and widgets.groundY.value == 63 and widgets.cx.value == 0,
       "saved Place values out of range open clamped " .. tostring(why or ""))
-check(widgets.addFrames.value == false, "a ghost saved without the option opens with Add frames off")
-opened, why = reopenWith(json.encode({ addFrames = "false" }))
-check(opened and widgets.addFrames.value == false, "a ghost saved with addFrames = \"false\" opens with Add frames off"
-      .. (why and (" (" .. tostring(why) .. ")") or ""))
 
 -- Art shorter than the Height minimum (#44): first-open auto-fit and the Fit button, with a
 -- selection 3px tall, both clamp to the 8px minimum, and the dialog stays usable.
