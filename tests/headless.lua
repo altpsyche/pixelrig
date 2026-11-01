@@ -90,8 +90,33 @@ do
   end
 end
 
--- Library: of two user files with one clip name, the first by file name loads (#7).
+-- Saving clips: file names never collide, duplicates never shadow, a failed write returns (#7).
 do
+  local f = Clip.fileName
+  local function distinct(a, b)
+    local fa, fb = f(a), f(b)
+    check(fa ~= fb and fa:lower() ~= fb:lower(),
+          "file name: '" .. a .. "' and '" .. b .. "' differ (" .. fa .. ", " .. fb .. ")")
+  end
+  distinct("a/b", "a_b")
+  distinct("日本", "中文")
+  distinct("Walk", "walk")
+  distinct("a b", "a_b")
+  distinct("a.b", "a_2eb")
+  check(f("run test") == "run test.json", "file name: plain lowercase names stay readable (" .. f("run test") .. ")")
+  check(f("Run/test") == "^run_2ftest.json" and f("日本") == "_e6_97_a5_e6_9c_ac.json" and f("con") == "_63on.json",
+        "file name: uppercase as ^, other bytes as hex, device names escaped")
+  local safe = true
+  for _, n in ipairs({ "a/b", "a\\b", "日本", "x:y*z?", "C<>|\"", "..", "con", "Nul", "lpt1", "a.", "ü" }) do
+    local stem = f(n):gsub("%.json$", "")
+    local low = stem:lower()
+    if stem:find("[^%w%-_%^ ]") or low == "con" or low == "nul" or low:match("^lpt%d$") then
+      safe = false
+      print("     unsafe file name for '" .. n .. "': " .. f(n))
+    end
+  end
+  check(safe, "file name: only portable characters, no Windows device names")
+
   local dir = app.fs.joinPath(out, "saveclips")
   app.fs.makeAllDirectories(dir)
   for _, file in ipairs(app.fs.listFiles(dir)) do os.remove(app.fs.joinPath(dir, file)) end
@@ -116,6 +141,45 @@ do
   end
   check(listed, "library: the shadowed duplicate is listed as skipped")
   check(dup and Clip.export(dup).file == nil and Clip.export(dup).origin == nil, "export drops runtime fields")
+
+  -- Saving over an existing user clip writes its own file; a new name gets the encoded file.
+  local path, replacing = M.clipSavePath(dupLib, "Dup")
+  check(dup and path == dup.file and replacing == "your clip 'Dup'",
+        "save path: an existing user clip is saved over its own file (" .. tostring(replacing) .. ")")
+  local newPath, newReplacing = M.clipSavePath(dupLib, "a/b")
+  check(newPath == app.fs.joinPath(dir, "a_2fb.json") and newReplacing == nil,
+        "save path: a new name gets its encoded file")
+  -- A file already at the encoded name, as an older file differing only in case would be on a
+  -- disk that ignores case: saving asks, naming the clip the file holds.
+  put("^taken.json", "Something else", 9)
+  local _, takenReplacing = M.clipSavePath(dupLib, "Taken")
+  check(takenReplacing == "your clip 'Something else' (^taken.json)",
+        "save path: a file under the new name is named with its clip (" .. tostring(takenReplacing) .. ")")
+  Util.writeJson(app.fs.joinPath(dir, "^junk.json"), { 1, 2 })
+  local _, junkReplacing = M.clipSavePath(dupLib, "Junk")
+  check(junkReplacing == "the file ^junk.json", "save path: a file holding no clip is named as a file")
+
+  local d = Util.deepCopy(run)
+  d.name, d.fps = "Dup", 20
+  local okWrite = Util.writeJson(path, d)
+  local after = M.loadLibrary().clips.Dup
+  check(okWrite and after and after.fps == 20, "library shows the saved clip afterwards")
+
+  -- A write that cannot happen returns nil and a reason, and leaves the old file as it was.
+  local blocked = app.fs.joinPath(dir, "blocked.json")
+  app.fs.makeAllDirectories(blocked)
+  local okCall, res, reason = pcall(Util.writeJson, blocked, d)
+  check(okCall and res == nil, "failed write returns instead of raising " .. (okCall and "" or tostring(res)))
+  check(type(reason) == "string" and reason:sub(1, 14) == "blocked.json: " and not reason:find(dir, 1, true),
+        "failed write gives a one-line reason (" .. tostring(reason) .. ")")
+  check(not app.fs.isFile(blocked .. ".tmp"), "failed write leaves no temporary file")
+  -- The temporary file cannot be made (a folder sits there): the clip on disk is untouched.
+  app.fs.makeAllDirectories(path .. ".tmp")
+  d.fps = 30
+  local _, writeWhy = Util.writeJson(path, d)
+  os.remove(path .. ".tmp")
+  local kept = M.loadLibrary().clips.Dup
+  check(writeWhy ~= nil and kept and kept.fps == 20, "failed write keeps the clip that was there")
   M.userClipsDir = userDir
 end
 

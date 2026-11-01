@@ -72,6 +72,21 @@ return function(dir)
     return lib
   end
 
+  -- Where saving a clip named `name` writes, and what that replaces: nil when nothing, else a
+  -- short phrase for the question. An existing user clip is saved over its own file, so the saved
+  -- clip is the one the library shows afterwards; any other name gets Clip.fileName, where a file
+  -- may already sit (on a disk that ignores case, an older file differing only in case).
+  function M.clipSavePath(lib, name)
+    local have = lib.clips[name]
+    if have and have.origin == "user" then return have.file, "your clip '" .. name .. "'" end
+    local path = app.fs.joinPath(M.userClipsDir(), M.Clip.fileName(name))
+    if not app.fs.isFile(path) then return path, nil end
+    local ok, data = pcall(M.Util.readJson, path)
+    local held = ok and type(data) == "table" and type(data.name) == "string" and data.name
+    if held then return path, "your clip '" .. held .. "' (" .. app.fs.fileName(path) .. ")" end
+    return path, "the file " .. app.fs.fileName(path)
+  end
+
   M.Sections = mod("sections")
   M.UI = mod("ui")(M)
   return M
