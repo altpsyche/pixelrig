@@ -380,8 +380,8 @@ check(opened and widgets.style.value == "Capsule" and widgets.dirtyInfo.value ==
       "corrupt edited clip in settings -> library clip " .. tostring(why or ""))
 check(widgets.addFrames.value == false, "a ghost saved without the option opens with Add frames off")
 opened, why = reopenWith(json.encode({ addFrames = "false" }))
-check(opened and widgets.addFrames.value == false, "a ghost saved with addFrames = \"false\" opens with Add frames off "
-      .. tostring(why or ""))
+check(opened and widgets.addFrames.value == false, "a ghost saved with addFrames = \"false\" opens with Add frames off"
+      .. (why and (" (" .. tostring(why) .. ")") or ""))
 
 -- Drag every joint on a clip without leg.thigh or arm.shoulder: nothing raises (#4).
 do
